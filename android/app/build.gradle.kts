@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -36,6 +37,14 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
+    }
+
+    val supabaseUrl = providers.gradleProperty("supabaseUrl").orElse("")
+    val supabasePublishableKey = providers.gradleProperty("supabasePublishableKey").orElse("")
+    defaultConfig {
+        buildConfigField("String", "SUPABASE_URL", "\"${supabaseUrl.get()}\"")
+        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"${supabasePublishableKey.get()}\"")
     }
 }
 
@@ -48,6 +57,13 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+
+    implementation(platform(libs.supabase.bom))
+    implementation(libs.supabase.auth)
+    implementation(libs.supabase.postgrest)
+    implementation(libs.supabase.storage)
+    implementation(libs.ktor.android)
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
