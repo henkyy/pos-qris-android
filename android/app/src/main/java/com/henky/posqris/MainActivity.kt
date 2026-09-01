@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -23,7 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -36,9 +35,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.platform.LocalConfiguration
 import com.henky.posqris.navigation.PosDestination
 import com.henky.posqris.ui.PosResponsiveScaffold
 
@@ -114,19 +113,31 @@ private fun PosNavigationItems(
             )
         }
     } else {
-        destinations.take(4).forEach { destination ->
-            NavigationBarItem(
-                selected = destination.route == selectedRoute,
-                onClick = { onSelect(destination.route) },
-                icon = {
-                    Text(
-                        text = destination.title.take(1),
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                label = { Text(destination.title, maxLines = 1) }
-            )
+        NavigationBar {
+            destinations.take(4).forEach { destination ->
+                val selected = destination.route == selectedRoute
+                TextButton(
+                    onClick = { onSelect(destination.route) },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = destination.title.take(1),
+                            fontWeight = FontWeight.Bold,
+                            color = if (selected) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                        Text(
+                            text = destination.title,
+                            maxLines = 1,
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -151,7 +162,6 @@ private fun DashboardScreen() {
         ) {
             Column {
                 Text("Dashboard", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(4.dp))
                 Text("Ringkasan operasional toko hari ini", style = MaterialTheme.typography.bodyMedium)
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -161,7 +171,7 @@ private fun DashboardScreen() {
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.primary)
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                SpacerWidth(8.dp)
                 Text("Toko Demo • Online", style = MaterialTheme.typography.labelLarge)
             }
         }
@@ -178,9 +188,7 @@ private fun DashboardScreen() {
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Penjualan hari ini", style = MaterialTheme.typography.labelLarge)
-                    Spacer(modifier = Modifier.height(6.dp))
                     Text("Rp 1.250.000", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(4.dp))
                     Text("+12,5% dibanding kemarin", style = MaterialTheme.typography.bodySmall)
                 }
                 TextButton(onClick = {}) { Text("Lihat laporan") }
@@ -208,9 +216,7 @@ private fun SummaryCard(title: String, value: String) {
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
             Text(title, style = MaterialTheme.typography.labelLarge)
-            Spacer(modifier = Modifier.height(10.dp))
             Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(6.dp))
             Text("Data demo", style = MaterialTheme.typography.bodySmall)
         }
     }
@@ -234,4 +240,9 @@ private fun FeaturePlaceholderScreen(title: String) {
             )
         }
     }
+}
+
+@Composable
+private fun SpacerWidth(width: Int) {
+    Box(modifier = Modifier.width(width.dp).height(1.dp))
 }
