@@ -23,8 +23,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.rememberSaveable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
@@ -54,7 +55,7 @@ private fun PosAppShell() {
         PosDestination.Reports,
         PosDestination.Settings
     )
-    var selectedRoute by rememberSaveable { mutableStateOf(PosDestination.Dashboard.route) }
+    var selectedRoute by remember { mutableStateOf(PosDestination.Dashboard.route) }
 
     PosResponsiveScaffold(
         navigation = {
@@ -85,18 +86,15 @@ private fun PosNavigationItems(
     val isCompact = LocalConfiguration.current.screenWidthDp < 600
 
     if (isCompact) {
-        Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
             destinations.take(4).forEach { destination ->
                 TextButton(onClick = { onSelect(destination.route) }) {
-                    Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
-                        Text(
-                            text = destination.title.take(1),
-                            style = MaterialTheme.typography.labelLarge
-                        )
-                        Text(
-                            text = destination.title,
-                            style = MaterialTheme.typography.labelSmall
-                        )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(destination.title.take(1), style = MaterialTheme.typography.labelLarge)
+                        Text(destination.title, style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }
@@ -127,10 +125,7 @@ private fun DashboardScreen() {
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text("Dashboard", style = MaterialTheme.typography.headlineMedium)
-        Text(
-            "Ringkasan operasional toko",
-            style = MaterialTheme.typography.bodyMedium
-        )
+        Text("Ringkasan operasional toko", style = MaterialTheme.typography.bodyMedium)
 
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = 180.dp),
