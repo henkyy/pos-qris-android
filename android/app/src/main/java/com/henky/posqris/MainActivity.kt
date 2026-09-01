@@ -37,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.henky.posqris.navigation.PosDestination
 import com.henky.posqris.ui.PosResponsiveScaffold
@@ -243,6 +244,6 @@ private fun FeaturePlaceholderScreen(title: String) {
 }
 
 @Composable
-private fun SpacerWidth(width: Int) {
-    Box(modifier = Modifier.width(width.dp).height(1.dp))
+private fun SpacerWidth(width: Dp) {
+    Box(modifier = Modifier.width(width).height(1.dp))
 }
