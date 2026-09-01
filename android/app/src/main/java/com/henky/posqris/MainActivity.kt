@@ -17,16 +17,16 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationRailItem
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import com.henky.posqris.navigation.PosDestination
 import com.henky.posqris.ui.PosResponsiveScaffold
@@ -54,39 +54,63 @@ private fun PosAppShell() {
         PosDestination.Reports,
         PosDestination.Settings
     )
-    var selectedRoute by remember { mutableStateOf(PosDestination.Dashboard.route) }
-    val selected = destinations.firstOrNull { it.route == selectedRoute } ?: PosDestination.Dashboard
+    var selectedRoute by rememberSaveable { mutableStateOf(PosDestination.Dashboard.route) }
 
     PosResponsiveScaffold(
         navigation = {
-            val isCompact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 600
-            if (isCompact) {
-                destinations.take(4).forEach { destination ->
-                    NavigationBarItem(
-                        selected = destination.route == selectedRoute,
-                        onClick = { selectedRoute = destination.route },
-                        icon = { Text(destination.title.take(1)) },
-                        label = { Text(destination.title) }
-                    )
-                }
-            } else {
-                destinations.forEach { destination ->
-                    NavigationRailItem(
-                        selected = destination.route == selectedRoute,
-                        onClick = { selectedRoute = destination.route },
-                        icon = { Text(destination.title.take(1)) },
-                        label = { Text(destination.title) }
-                    )
-                }
-            }
+            PosNavigationItems(
+                destinations = destinations,
+                selectedRoute = selectedRoute,
+                onSelect = { selectedRoute = it }
+            )
         },
         content = {
-            when (selected.route) {
-                PosDestination.Dashboard.route -> DashboardScreen()
+            val selected = destinations.firstOrNull { it.route == selectedRoute }
+                ?: PosDestination.Dashboard
+
+            when (selected) {
+                PosDestination.Dashboard -> DashboardScreen()
                 else -> FeaturePlaceholderScreen(selected.title)
             }
         }
     )
+}
+
+@Composable
+private fun PosNavigationItems(
+    destinations: List<PosDestination>,
+    selectedRoute: String,
+    onSelect: (String) -> Unit
+) {
+    val isCompact = LocalConfiguration.current.screenWidthDp < 600
+
+    if (isCompact) {
+        Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            destinations.take(4).forEach { destination ->
+                TextButton(onClick = { onSelect(destination.route) }) {
+                    Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
+                        Text(
+                            text = destination.title.take(1),
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                        Text(
+                            text = destination.title,
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                }
+            }
+        }
+    } else {
+        destinations.forEach { destination ->
+            NavigationRailItem(
+                selected = destination.route == selectedRoute,
+                onClick = { onSelect(destination.route) },
+                icon = { Text(destination.title.take(1)) },
+                label = { Text(destination.title) }
+            )
+        }
+    }
 }
 
 @Composable
@@ -129,7 +153,7 @@ private fun DashboardScreen() {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text("Status sistem", style = MaterialTheme.typography.titleMedium)
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("Aplikasi POS siap dikembangkan ke autentikasi dan Supabase.")
+                Text("Aplikasi POS siap dihubungkan ke autentikasi dan Supabase.")
                 Spacer(modifier = Modifier.height(12.dp))
                 Button(onClick = {}) {
                     Text("Buka Penjualan")
