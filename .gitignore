@@ -1,0 +1,26 @@
+# Android / Gradle
+.gradle/
+**/build/
+local.properties
+*.iml
+.idea/
+.DS_Store
+
+# Secrets / environment
+.env
+.env.*
+!.env.example
+*.keystore
+*.jks
+
+# Node
+node_modules/
+dist/
+coverage/
+
+# Backend local files
+.supabase/
+
+# OS / editor
+.vscode/settings.json
+Thumbs.db
