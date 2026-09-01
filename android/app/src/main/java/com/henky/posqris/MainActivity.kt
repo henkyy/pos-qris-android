@@ -3,7 +3,9 @@ package com.henky.posqris
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,13 +13,19 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.material3.Button
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -27,8 +35,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalConfiguration
 import com.henky.posqris.navigation.PosDestination
 import com.henky.posqris.ui.PosResponsiveScaffold
 
@@ -37,7 +47,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             MaterialTheme {
-                PosAppShell()
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    PosAppShell()
+                }
             }
         }
     }
@@ -83,29 +95,37 @@ private fun PosNavigationItems(
     selectedRoute: String,
     onSelect: (String) -> Unit
 ) {
-    val isCompact = LocalConfiguration.current.screenWidthDp < 600
+    val isTablet = LocalConfiguration.current.screenWidthDp >= 600
 
-    if (isCompact) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            destinations.take(4).forEach { destination ->
-                TextButton(onClick = { onSelect(destination.route) }) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(destination.title.take(1), style = MaterialTheme.typography.labelLarge)
-                        Text(destination.title, style = MaterialTheme.typography.labelSmall)
-                    }
-                }
-            }
-        }
-    } else {
+    if (isTablet) {
         destinations.forEach { destination ->
             NavigationRailItem(
                 selected = destination.route == selectedRoute,
                 onClick = { onSelect(destination.route) },
-                icon = { Text(destination.title.take(1)) },
-                label = { Text(destination.title) }
+                icon = {
+                    Text(
+                        text = destination.title.take(1),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                label = { Text(destination.title, maxLines = 1) },
+                alwaysShowLabel = false
+            )
+        }
+    } else {
+        destinations.take(4).forEach { destination ->
+            NavigationBarItem(
+                selected = destination.route == selectedRoute,
+                onClick = { onSelect(destination.route) },
+                icon = {
+                    Text(
+                        text = destination.title.take(1),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                label = { Text(destination.title, maxLines = 1) }
             )
         }
     }
@@ -114,46 +134,84 @@ private fun PosNavigationItems(
 @Composable
 private fun DashboardScreen() {
     val cards = listOf(
-        "Penjualan Hari Ini" to "Rp 0",
-        "Transaksi" to "0",
-        "Pembayaran QRIS" to "Rp 0",
-        "Stok Menipis" to "0"
+        "Penjualan Hari Ini" to "Rp 1.250.000",
+        "Transaksi" to "24",
+        "Pembayaran QRIS" to "Rp 875.000",
+        "Stok Menipis" to "3"
     )
 
     Column(
         modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
-        Text("Dashboard", style = MaterialTheme.typography.headlineMedium)
-        Text("Ringkasan operasional toko", style = MaterialTheme.typography.bodyMedium)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column {
+                Text("Dashboard", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text("Ringkasan operasional toko hari ini", style = MaterialTheme.typography.bodyMedium)
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Toko Demo • Online", style = MaterialTheme.typography.labelLarge)
+            }
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(20.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Penjualan hari ini", style = MaterialTheme.typography.labelLarge)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text("Rp 1.250.000", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("+12,5% dibanding kemarin", style = MaterialTheme.typography.bodySmall)
+                }
+                TextButton(onClick = {}) { Text("Lihat laporan") }
+            }
+        }
 
         LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 180.dp),
-            modifier = Modifier.fillMaxWidth(),
+            columns = GridCells.Adaptive(minSize = 190.dp),
+            modifier = Modifier.fillMaxWidth().weight(1f),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             items(cards) { (title, value) ->
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(title, style = MaterialTheme.typography.labelLarge)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(value, style = MaterialTheme.typography.headlineSmall)
-                    }
-                }
+                SummaryCard(title, value)
             }
         }
+    }
+}
 
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("Status sistem", style = MaterialTheme.typography.titleMedium)
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("Aplikasi POS siap dihubungkan ke autentikasi dan Supabase.")
-                Spacer(modifier = Modifier.height(12.dp))
-                Button(onClick = {}) {
-                    Text("Buka Penjualan")
-                }
-            }
+@Composable
+private fun SummaryCard(title: String, value: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            Text(title, style = MaterialTheme.typography.labelLarge)
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(6.dp))
+            Text("Data demo", style = MaterialTheme.typography.bodySmall)
         }
     }
 }
@@ -164,10 +222,16 @@ private fun FeaturePlaceholderScreen(title: String) {
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text(title, style = MaterialTheme.typography.headlineMedium)
+        Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Text(
-            "Modul ini sudah masuk ke shell aplikasi dan akan dihubungkan ke repository serta Supabase pada tahap berikutnya.",
+            "Modul sedang disiapkan dengan data demo. Struktur layar dibuat responsif untuk ponsel dan tablet.",
             style = MaterialTheme.typography.bodyLarge
         )
+        Card(shape = RoundedCornerShape(16.dp)) {
+            Text(
+                "Konten modul akan terhubung ke Supabase pada tahap integrasi data.",
+                modifier = Modifier.padding(18.dp)
+            )
+        }
     }
 }
