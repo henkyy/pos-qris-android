@@ -1,0 +1,7 @@
+# Salin file ini menjadi android/local.properties untuk build lokal.
+# Jangan commit android/local.properties karena berisi konfigurasi mesin lokal.
+# Nilai publishable key aman untuk aplikasi client, tetapi tetap jangan commit konfigurasi rahasia lain.
+
+sdk.dir=C\\:\\Users\\<USERNAME>\\AppData\\Local\\Android\\Sdk
+supabaseUrl=https://pbcjiqwifiivibfrkbaf.supabase.co
+supabasePublishableKey=ISI_PUBLISHABLE_KEY_DI_MESIN_LOKAL
