@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationRail
 import androidx.compose.runtime.Composable
@@ -30,13 +31,18 @@ fun PosResponsiveScaffold(
                 .statusBarsPadding(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            NavigationRail(modifier = Modifier.navigationBarsPadding()) {
+            NavigationRail(
+                modifier = Modifier
+                    .width(88.dp)
+                    .navigationBarsPadding()
+            ) {
                 navigation()
             }
             Box(
                 modifier = Modifier
+                    .weight(1f)
                     .fillMaxSize()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .padding(start = 12.dp, end = 24.dp, top = 20.dp, bottom = 20.dp)
             ) {
                 content()
             }
@@ -51,7 +57,7 @@ fun PosResponsiveScaffold(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .padding(horizontal = 16.dp, vertical = 14.dp)
             ) {
                 content()
             }
