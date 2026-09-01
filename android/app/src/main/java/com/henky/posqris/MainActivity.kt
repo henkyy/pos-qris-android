@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -26,7 +25,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -114,38 +112,36 @@ private fun PosNavigationItems(
             )
         }
     } else {
-        NavigationBar(modifier = Modifier.navigationBarsPadding()) {
-            Row(modifier = Modifier.fillMaxWidth()) {
-                destinations.take(4).forEach { destination ->
-                    val selected = destination.route == selectedRoute
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(horizontal = 3.dp, vertical = 4.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(
-                                if (selected) MaterialTheme.colorScheme.secondaryContainer
-                                else MaterialTheme.colorScheme.surface
+        Row(modifier = Modifier.fillMaxWidth()) {
+            destinations.take(4).forEach { destination ->
+                val selected = destination.route == selectedRoute
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 3.dp, vertical = 4.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(
+                            if (selected) MaterialTheme.colorScheme.secondaryContainer
+                            else MaterialTheme.colorScheme.surface
+                        )
+                        .padding(vertical = 5.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    TextButton(onClick = { onSelect(destination.route) }) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                navigationSymbol(destination),
+                                fontWeight = FontWeight.Bold,
+                                color = if (selected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            .padding(vertical = 5.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        TextButton(onClick = { onSelect(destination.route) }) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    navigationSymbol(destination),
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (selected) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    destination.title,
-                                    maxLines = 1,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = if (selected) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
+                            Text(
+                                destination.title,
+                                maxLines = 1,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (selected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }
