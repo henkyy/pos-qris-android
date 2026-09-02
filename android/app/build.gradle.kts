@@ -40,8 +40,6 @@ android {
         buildConfig = true
     }
 
-    // Client-side Supabase configuration. The publishable key is intended for app clients.
-    // Keep the endpoint fixed so local Gradle properties cannot accidentally point the app to localhost.
     defaultConfig {
         buildConfigField("String", "SUPABASE_URL", "\"https://pbcjiqwifiivibfrkbaf.supabase.co\"")
         buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"sb_publishable_evB3a1ZFLKbvkibL-Drggg_O44g8zAc\"")
@@ -57,6 +55,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    implementation("androidx.compose.material:material-icons-extended")
 
     implementation(platform(libs.supabase.bom))
     implementation(libs.supabase.auth)
