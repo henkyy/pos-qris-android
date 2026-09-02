@@ -1,5 +1,3 @@
 package com.henky.posqris
 
-import androidx.compose.foundation.BorderStroke
-
-typealias PosBorderStroke = BorderStroke
+typealias BorderStroke = androidx.compose.foundation.BorderStroke
