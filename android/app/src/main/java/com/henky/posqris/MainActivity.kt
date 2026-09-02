@@ -205,7 +205,7 @@ private fun icon(route: String) = when (route) {
     LaunchedEffect(Unit) { try { sales = supabase.from("sales").select { filter { eq("business_id", businessId()) } }.decodeList() } catch (_: Exception) { error = true } finally { loading = false } }
     val total = sales.sumOf { it.total_amount }
     val avg = if (sales.isEmpty()) 0 else total / sales.size
-    Page("Dashboard", "Ringkasan operasional • Toko Utama", Button(onClick = onNewSale, shape = RoundedCornerShape(9.dp), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)) { Text("＋ Penjualan Baru", fontWeight = FontWeight.Bold) }) {
+    Page("Dashboard", "Ringkasan operasional • Toko Utama", { Button(onClick = onNewSale, shape = RoundedCornerShape(9.dp), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)) { Text("＋ Penjualan Baru", fontWeight = FontWeight.Bold) } }) {
         if (error) Notice("Data belum dapat dimuat. Periksa koneksi internet lalu coba lagi.", true)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Kpi("Penjualan hari ini", money(total), "LIVE", true, Modifier.weight(1.25f))
@@ -264,7 +264,7 @@ private fun icon(route: String) = when (route) {
     LaunchedEffect(Unit) { try { val business = businessId(); products = supabase.from("products").select { filter { eq("business_id", business); eq("is_active", true) } }.decodeList(); prices = supabase.from("product_prices").select().decodeList(); categories = supabase.from("categories").select { filter { eq("business_id", business); eq("is_active", true) } }.decodeList() } catch (_: Exception) { message = "Produk belum dapat dimuat. Periksa koneksi internet lalu coba lagi." } }
     val filtered = products.filter { (selectedCategory == "Semua" || categories.firstOrNull { c -> c.id == it.category_id }?.name == selectedCategory) && (query.isBlank() || it.name.contains(query, true) || it.sku.contains(query, true)) }
     val total = cart.sumOf { it.price * it.qty }
-    Page("Penjualan Baru", "Kasir cepat • retail & distributor", if (tablet) Button(onClick = { cart = emptyList() }, enabled = cart.isNotEmpty(), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEAF1F8), contentColor = Blue), shape = RoundedCornerShape(9.dp)) { Text("Kosongkan") } else null) {
+    Page("Penjualan Baru", "Kasir cepat • retail & distributor", if (tablet) ({ Button(onClick = { cart = emptyList() }, enabled = cart.isNotEmpty(), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEAF1F8), contentColor = Blue), shape = RoundedCornerShape(9.dp)) { Text("Kosongkan") } }) else null) {
         message?.let { Notice(it, true) }
         if (tablet) Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             ProductCatalog(filtered, categories, selectedCategory, query, prices, Modifier.weight(1.55f), { query = it }, { selectedCategory = it }) { product -> cart = addToCart(cart, product, priceOf(product, prices)) }
@@ -346,7 +346,7 @@ private suspend fun checkout(cart: List<CartLine>): String {
     var products by remember { mutableStateOf<List<Product>>(emptyList()) }; var unit by remember { mutableStateOf<PosUnit?>(null) }; var priceList by remember { mutableStateOf<PriceList?>(null) }; var show by remember { mutableStateOf(false) }; var name by remember { mutableStateOf("") }; var sku by remember { mutableStateOf("") }; var price by remember { mutableStateOf("") }; var message by remember { mutableStateOf<String?>(null) }; val scope = rememberCoroutineScope()
     suspend fun reload() { val business = businessId(); products = supabase.from("products").select { filter { eq("business_id", business); eq("is_active", true) } }.decodeList(); unit = supabase.from("units").select { filter { eq("business_id", business); eq("code", "PCS") } }.decodeList<PosUnit>().firstOrNull(); priceList = supabase.from("price_lists").select { filter { eq("business_id", business); eq("is_default", true) } }.decodeList<PriceList>().firstOrNull() }
     LaunchedEffect(Unit) { try { reload() } catch (_: Exception) { message = "Produk belum dapat dimuat. Periksa koneksi internet lalu coba lagi." } }
-    Page("Produk", "Katalog, SKU, harga jual, dan status produk", Button(onClick = { show = true }, shape = RoundedCornerShape(9.dp)) { Text("＋ Produk", fontWeight = FontWeight.Bold) }) {
+    Page("Produk", "Katalog, SKU, harga jual, dan status produk", { Button(onClick = { show = true }, shape = RoundedCornerShape(9.dp)) { Text("＋ Produk", fontWeight = FontWeight.Bold) } }) {
         message?.let { Notice(it, it.startsWith("Gagal") || it.contains("belum dapat")) }
         if (show) {
             Surface(Modifier.fillMaxWidth(), color = Surface, shape = RoundedCornerShape(13.dp), border = BorderStroke(1.dp, Border)) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
