@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -133,7 +134,7 @@ private fun ProductPrice.matches(product: Product): Boolean = product_id == prod
     }
 }
 
-@Composable private fun Page(title: String, subtitle: String, content: @Composable () -> kotlin.Unit) {
+@Composable private fun Page(title: String, subtitle: String, content: @Composable ColumnScope.() -> kotlin.Unit) {
     Column(Modifier.fillMaxSize().padding(20.dp, 18.dp, 20.dp, 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold)
         Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
