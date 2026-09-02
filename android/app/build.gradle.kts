@@ -40,11 +40,11 @@ android {
         buildConfig = true
     }
 
-    val supabaseUrl = providers.gradleProperty("supabaseUrl").orElse("")
-    val supabasePublishableKey = providers.gradleProperty("supabasePublishableKey").orElse("")
+    // Client-side Supabase configuration. The publishable key is intended for app clients.
+    // Keep the endpoint fixed so local Gradle properties cannot accidentally point the app to localhost.
     defaultConfig {
-        buildConfigField("String", "SUPABASE_URL", "\"${supabaseUrl.get()}\"")
-        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"${supabasePublishableKey.get()}\"")
+        buildConfigField("String", "SUPABASE_URL", "\"https://pbcjiqwifiivibfrkbaf.supabase.co\"")
+        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"sb_publishable_evB3a1ZFLKbvkibL-Drggg_O44g8zAc\"")
     }
 }
 
