@@ -5,7 +5,7 @@
         android:label="POS QRIS"
         android:supportsRtl="true">
         <activity
-            android:name=".PosUiActivityV2"
+            android:name=".OwnerPosActivityV4"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
