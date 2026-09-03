@@ -1,0 +1,1 @@
+export type Customer = { id: string; business_id: string; code?: string; name: string; phone?: string | null; email?: string | null; address?: string | null; credit_limit?: number | null; is_active?: boolean }
