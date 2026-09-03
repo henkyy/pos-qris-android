@@ -41,7 +41,6 @@ export default function EntityPage({ config }: { config: EntityConfig }) {
 
   useEffect(() => { load() }, [load])
   const displayColumns = useMemo(() => config.columns, [config.columns])
-
   function startCreate() { setEditing(null); setForm({}); setOpen(true) }
   function startEdit(row: Record<string, unknown>) { setEditing(row); setForm(Object.fromEntries((config.fields || []).map(f => [f.key, String(row[f.key] ?? '')]))); setOpen(true) }
 
@@ -65,10 +64,5 @@ export default function EntityPage({ config }: { config: EntityConfig }) {
     finally { setSaving(false) }
   }
 
-  return <div className="module-page">
-    <div className="module-hero"><div><span className="eyebrow">{config.eyebrow}</span><h1>{config.title}</h1><p>{config.description}</p></div>{!config.readOnly && config.fields?.length ? <Button onClick={startCreate}>+ Tambah</Button> : null}</div>
-    {error && <div className="module-alert">{error}</div>}
-    <section className="module-card"><div className="module-card-head"><div><strong>Daftar {config.title}</strong><span>{loading ? 'Memuat data…' : `${rows.length} data`}</span></div><Button variant="secondary" onClick={load} disabled={loading}>Muat ulang</Button></div>{loading ? <EmptyState title="Memuat data" text="Mengambil data dari Supabase." /> : rows.length ? <Table columns={displayColumns} rows={rows} /> : <EmptyState title="Belum ada data" text="Belum ada record yang tersedia untuk modul ini." />}</section>
-    {config.fields?.length ? <Modal open={open} title={editing ? `Edit ${config.title}` : `Tambah ${config.title}`} onClose={() => setOpen(false)}><div className="module-form">{config.fields.map(field => <Input key={field.key} label={field.label} type={field.type === 'number' ? 'number' : 'text'} value={form[field.key] || ''} onChange={e => setForm(prev => ({ ...prev, [field.key]: e.target.value }))} />)}<Button onClick={save} disabled={saving}>{saving ? 'Menyimpan…' : 'Simpan'}</Button></div></Modal> : null}
-  </div>
+  return <div className="module-page"><div className="module-hero"><div><span className="eyebrow">{config.eyebrow}</span><h1>{config.title}</h1><p>{config.description}</p></div>{!config.readOnly && config.fields?.length ? <Button onClick={startCreate}>+ Tambah</Button> : null}</div>{error && <div className="module-alert">{error}</div>}<section className="module-card"><div className="module-card-head"><div><strong>Daftar {config.title}</strong><span>{loading ? 'Memuat data…' : `${rows.length} data`}</span></div><Button variant="secondary" onClick={load} disabled={loading}>Muat ulang</Button></div>{loading ? <EmptyState title="Memuat data" text="Mengambil data dari Supabase." /> : rows.length ? <Table columns={displayColumns} rows={rows} onEdit={!config.readOnly && config.fields?.length ? startEdit : undefined} /> : <EmptyState title="Belum ada data" text="Belum ada record yang tersedia untuk modul ini." />}</section>{config.fields?.length ? <Modal open={open} title={editing ? `Edit ${config.title}` : `Tambah ${config.title}`} onClose={() => setOpen(false)}><div className="module-form">{config.fields.map(field => <Input key={field.key} label={field.label} type={field.type === 'number' ? 'number' : 'text'} value={form[field.key] || ''} onChange={e => setForm(prev => ({ ...prev, [field.key]: e.target.value }))} />)}<Button onClick={save} disabled={saving}>{saving ? 'Menyimpan…' : 'Simpan'}</Button></div></Modal> : null}</div>
 }
