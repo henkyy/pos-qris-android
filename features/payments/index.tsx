@@ -1,3 +1,7 @@
 import EntityPage from '../shared/EntityPage'
 import { entityConfigs } from '../shared/config'
-export default function PaymentsPage() { return <EntityPage config={entityConfigs.payments} /> }
+import PaymentMethodsPanel from './PaymentMethodsPanel'
+
+export default function PaymentsPage() {
+  return <div className="module-page"><PaymentMethodsPanel /><EntityPage config={entityConfigs.payments} /></div>
+}
