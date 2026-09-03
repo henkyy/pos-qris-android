@@ -150,8 +150,8 @@ fun OwnerPosAppV5() {
     val main = listOf("Dashboard", "Penjualan", "Produk", "Stok")
     Surface(modifier = Modifier.fillMaxWidth().navigationBarsPadding(), color = Color.White, shadowElevation = 14.dp) {
         Row(modifier = Modifier.fillMaxWidth().padding(7.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            main.forEach { item -> NavItem(item, selected == item, Modifier.weight(1f), onSelect) }
-            NavItem("Lainnya", selected !in main, Modifier.weight(1f), { onMore() })
+            main.forEach { item -> NavItem(item, selected == item, Modifier.weight(1f)) { onSelect(item) } }
+            NavItem("Lainnya", selected !in main, Modifier.weight(1f)) { onMore() }
         }
     }
 }
