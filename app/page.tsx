@@ -26,15 +26,15 @@ const menus: Menu[] = [
 const mobileMenus = menus.filter(x => ['Dashboard', 'Penjualan', 'Laporan'].includes(x.id))
 const modeOptions: { id: ViewMode; label: string; icon: string; desc: string }[] = [
   { id: 'retail', label: 'Retail', icon: '▦', desc: 'Kasir cepat, katalog dan transaksi harian.' },
-  { id: 'distributor', label: 'Distributor', icon: '▤', desc: 'Siapkan alur pelanggan, harga bertingkat dan penjualan grosir.' },
-  { id: 'fnb', label: 'F&B', icon: '♨', desc: 'Siapkan meja, modifier, catatan dan alur dapur.' },
+  { id: 'distributor', label: 'Distributor', icon: '▤', desc: 'Penjualan grosir, kuantitas besar dan harga bertingkat.' },
+  { id: 'fnb', label: 'F&B', icon: '♨', desc: 'Kasir restoran, meja, catatan pesanan dan dapur.' },
 ]
 
 function Placeholder({ menu }: { menu: Menu }) {
   return <div className={styles.placeholder}><div className={styles.placeholderGlow} /><div className={styles.placeholderCard}><div className={styles.placeholderIcon}>{menu.icon}</div><div className={styles.eyebrow}>{menu.group.toUpperCase()}</div><h2 className={styles.title}>{menu.id}</h2><p className={styles.text}>{menu.desc}. Modul ini tetap menjadi bagian dari aplikasi dan siap diaktifkan tanpa mengganggu alur Penjualan.</p><div className={styles.comingSoon}><span /> Modul sedang disiapkan</div></div></div>
 }
 
-function OwnerSettings() {
+function OwnerSettings({ onModeChanged }: { onModeChanged: (mode: ViewMode) => void }) {
   const [mode, setMode] = useState<ViewMode>('retail')
   const [saved, setSaved] = useState(false)
 
@@ -46,14 +46,16 @@ function OwnerSettings() {
   function saveMode(next: ViewMode) {
     setMode(next)
     window.localStorage.setItem('qris-view-mode', next)
+    window.dispatchEvent(new CustomEvent('qris-mode-changed', { detail: next }))
+    onModeChanged(next)
     setSaved(true)
     window.setTimeout(() => setSaved(false), 2200)
   }
 
   return <div className={styles.settingsPage}>
-    <div className={styles.settingsHero}><div><span className={styles.eyebrow}>SISTEM · OWNER</span><h1>Pengaturan</h1><p>Konfigurasi pengalaman kasir. Pilihan mode hanya dikelola dari sini, bukan dari layar Penjualan.</p></div><div className={styles.ownerBadge}>OWNER</div></div>
-    <section className={styles.settingsCard}><div className={styles.settingsCardHead}><div><h2>Mode tampilan Penjualan</h2><p>Mode menentukan pengalaman kerja kasir. Implementasi workflow Distributor dan F&B akan dikembangkan bertahap tanpa mengubah data transaksi Retail.</p></div>{saved && <span className={styles.savedBadge}>✓ Tersimpan</span>}</div><div className={styles.modeCards}>{modeOptions.map(option => <button key={option.id} className={`${styles.modeCard} ${mode === option.id ? styles.modeCardActive : ''}`} onClick={() => saveMode(option.id)}><span className={styles.modeCardIcon}>{option.icon}</span><div><strong>{option.label}</strong><p>{option.desc}</p></div>{mode === option.id && <span className={styles.modeCheck}>✓</span>}</button>)}</div></section>
-    <section className={styles.settingsInfo}><div><strong>Catatan akses</strong><p>Pengaturan mode ditempatkan di area Owner. Saat autentikasi role diterapkan, halaman ini dapat dibatasi server-side untuk akun Owner.</p></div><div className={styles.infoPill}>Konfigurasi tersimpan di browser</div></section>
+    <div className={styles.settingsHero}><div><span className={styles.eyebrow}>SISTEM · OWNER</span><h1>Pengaturan</h1><p>Konfigurasi pengalaman kasir. Mode Penjualan dikelola dari sini.</p></div><div className={styles.ownerBadge}>OWNER</div></div>
+    <section className={styles.settingsCard}><div className={styles.settingsCardHead}><div><h2>Mode tampilan Penjualan</h2><p>Setiap mode memiliki tata letak dan alur kerja berbeda. Perubahan berlaku langsung ke layar Penjualan.</p></div>{saved && <span className={styles.savedBadge}>✓ Tersimpan</span>}</div><div className={styles.modeCards}>{modeOptions.map(option => <button key={option.id} className={`${styles.modeCard} ${mode === option.id ? styles.modeCardActive : ''}`} onClick={() => saveMode(option.id)}><span className={styles.modeCardIcon}>{option.icon}</span><div><strong>{option.label}</strong><p>{option.desc}</p></div>{mode === option.id && <span className={styles.modeCheck}>✓</span>}</button>)}</div></section>
+    <section className={styles.settingsInfo}><div><strong>Mode aktif</strong><p>{modeOptions.find(x => x.id === mode)?.label} akan digunakan pada Penjualan.</p></div><div className={styles.infoPill}>Tersimpan di browser</div></section>
   </div>
 }
 
@@ -61,9 +63,20 @@ export default function HomePage() {
   const [active, setActive] = useState<MenuId>('Penjualan')
   const [menuOpen, setMenuOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [salesMode, setSalesMode] = useState<ViewMode>('retail')
 
   useEffect(() => {
-    try { setSidebarCollapsed(window.localStorage.getItem('qris-sidebar-collapsed') === '1') } catch {}
+    try {
+      setSidebarCollapsed(window.localStorage.getItem('qris-sidebar-collapsed') === '1')
+      const saved = window.localStorage.getItem('qris-view-mode') as ViewMode | null
+      if (saved && modeOptions.some(x => x.id === saved)) setSalesMode(saved)
+    } catch {}
+    const onModeChanged = (event: Event) => {
+      const next = (event as CustomEvent<ViewMode>).detail
+      if (modeOptions.some(x => x.id === next)) setSalesMode(next)
+    }
+    window.addEventListener('qris-mode-changed', onModeChanged)
+    return () => window.removeEventListener('qris-mode-changed', onModeChanged)
   }, [])
 
   function toggleSidebar() {
@@ -83,7 +96,7 @@ export default function HomePage() {
       <nav className={styles.nav}>{['Utama', 'Transaksi', 'Master', 'Analitik', 'Sistem'].map(group => <div className={styles.navGroup} key={group}><div className={styles.navLabel}>{group}</div>{menus.filter(menu => menu.group === group).map(menu => <button key={menu.id} title={sidebarCollapsed ? menu.id : undefined} className={`${styles.navButton} ${active === menu.id ? styles.navActive : ''}`} onClick={() => selectMenu(menu.id)}><span className={styles.icon}>{menu.icon}</span><span className={styles.navText}>{menu.id}</span>{active === menu.id && <span className={styles.activeMark} />}</button>)}</div>)}</nav>
       <div className={styles.sidebarFooter}><div className={styles.userAvatar}>O</div><div className={styles.userMeta}><strong>Owner</strong><span>Administrator</span></div><button className={styles.moreButton} aria-label="Opsi pengguna">•••</button></div>
     </aside>
-    <main className={styles.main}>{active === 'Penjualan' ? <SalesTerminal /> : active === 'Pengaturan' ? <OwnerSettings /> : <Placeholder menu={menus.find(x => x.id === active)!} />}</main>
+    <main className={styles.main}>{active === 'Penjualan' ? <SalesTerminal mode={salesMode} /> : active === 'Pengaturan' ? <OwnerSettings onModeChanged={setSalesMode} /> : <Placeholder menu={menus.find(x => x.id === active)!} />}</main>
     {menuOpen && <div className={styles.mobileMenuBackdrop} onClick={() => setMenuOpen(false)}><div className={styles.mobileMenu} onClick={e => e.stopPropagation()}><div className={styles.mobileMenuHead}><div><strong>Menu POS</strong><span>Semua fitur aplikasi</span></div><button onClick={() => setMenuOpen(false)}>×</button></div><div className={styles.mobileMenuGrid}>{menus.map(menu => <button key={menu.id} className={active === menu.id ? styles.mobileMenuActive : ''} onClick={() => selectMenu(menu.id)}><span>{menu.icon}</span><strong>{menu.id}</strong><small>{menu.desc}</small></button>)}</div></div></div>}
     <nav className={styles.mobileBar}>{mobileMenus.map(menu => <button key={menu.id} className={`${styles.mobileButton} ${active === menu.id ? styles.mobileActive : ''}`} onClick={() => selectMenu(menu.id)}><span className={styles.mobileIcon}>{menu.icon}</span><span>{menu.id}</span></button>)}<button className={styles.mobileButton} onClick={() => setMenuOpen(true)}><span className={styles.mobileIcon}>•••</span><span>Lainnya</span></button></nav>
   </div>
