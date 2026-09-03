@@ -1,0 +1,2 @@
+export type Permission = 'dashboard.read' | 'sales.read' | 'sales.write' | 'products.read' | 'products.write' | 'inventory.read' | 'inventory.write' | 'customers.read' | 'customers.write' | 'suppliers.read' | 'suppliers.write' | 'purchases.read' | 'purchases.write' | 'receivables.read' | 'receivables.write' | 'reports.read' | 'payments.read' | 'settings.write'
+export const hasPermission = (permissions: Permission[], required: Permission) => permissions.includes(required)

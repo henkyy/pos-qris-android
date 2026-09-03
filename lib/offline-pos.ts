@@ -1,5 +1,7 @@
 'use client'
 
+export type OfflinePaymentCode = 'CASH' | 'RECEIVABLE' | 'QRIS' | 'TRANSFER'
+
 export type OfflineCartItem = {
   product: Record<string, any>
   qty: number
@@ -13,8 +15,11 @@ export type OfflineSale = {
   customerId: string | null
   items: OfflineCartItem[]
   paymentMethodId: string
+  paymentCode?: OfflinePaymentCode
   total: number
   cashReceived: number
+  reference?: string
+  provider?: string | null
   discountAmount: number
   note: string
   idempotencyKey: string
@@ -30,11 +35,13 @@ type CatalogCache = {
   branchId: string
   locationId: string
   cashMethodId: string
+  paymentMethods?: Record<string, any>[]
+  customers?: Record<string, any>[]
   cachedAt: string
 }
 
 const DB_NAME = 'qris-pos-local'
-const DB_VERSION = 1
+const DB_VERSION = 2
 const SALES_STORE = 'pending-sales'
 const CATALOG_STORE = 'catalog'
 const CATALOG_KEY = 'active'
@@ -89,7 +96,15 @@ export async function getPendingOfflineSales(): Promise<OfflineSale[]> {
   const db = await openDb()
   return new Promise((resolve, reject) => {
     const request = db.transaction(SALES_STORE, 'readonly').objectStore(SALES_STORE).getAll()
-    request.onsuccess = () => { db.close(); resolve((request.result || []).sort((a, b) => a.createdAt.localeCompare(b.createdAt))) }
+    request.onsuccess = () => {
+      db.close()
+      resolve((request.result || []).map((sale: any) => ({
+        ...sale,
+        paymentCode: sale.paymentCode || 'CASH',
+        reference: sale.reference || '',
+        provider: sale.provider ?? null,
+      })).sort((a: OfflineSale, b: OfflineSale) => a.createdAt.localeCompare(b.createdAt)))
+    }
     request.onerror = () => { db.close(); reject(request.error) }
   })
 }
