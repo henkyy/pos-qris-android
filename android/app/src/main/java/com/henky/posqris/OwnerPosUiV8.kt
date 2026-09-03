@@ -26,6 +26,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.storage.storage
+import io.github.jan.supabase.storage.upload
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -486,7 +488,7 @@ private data class CartLineV8(val productId: String, val name: String, val sku: 
                 Spacer(Modifier.weight(1f))
                 Text("Total", color = muted, fontSize = 11.sp)
                 Text(money(total), color = navy, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
-                Button(enabled = cart.isNotEmpty() && !paying, onClick = { paying = true }, Modifier.fillMaxWidth()) { Text("Bayar") }
+                Button(enabled = cart.isNotEmpty() && !paying, onClick = { paying = true }, modifier = Modifier.fillMaxWidth()) { Text("Bayar") }
             }
         }
     }
