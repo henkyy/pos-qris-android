@@ -14,7 +14,7 @@ export type CheckoutPaymentInput = {
 
 export const PAYMENT_METHODS: Array<{ code: PaymentCode; name: string; offline: boolean; description: string }> = [
   { code: 'CASH', name: 'Tunai', offline: true, description: 'Bayar langsung dan bisa diproses tanpa koneksi.' },
-  { code: 'PIUTANG' as PaymentCode, name: 'Piutang', offline: true, description: 'Catat sebagai piutang pelanggan dan sinkronkan saat online.' },
+  { code: 'RECEIVABLE', name: 'Piutang', offline: true, description: 'Catat sebagai piutang pelanggan dan sinkronkan saat online.' },
   { code: 'QRIS', name: 'QRIS', offline: false, description: 'Menunggu konfirmasi dari integrasi/provider QRIS.' },
   { code: 'TRANSFER', name: 'Transfer', offline: false, description: 'Catat transfer sebagai pending sampai diverifikasi.' },
 ]
