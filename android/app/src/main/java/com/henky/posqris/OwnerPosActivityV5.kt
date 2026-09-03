@@ -7,6 +7,6 @@ import androidx.activity.compose.setContent
 class OwnerPosActivityV5 : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { OwnerPosAppV9() }
+        setContent { OwnerPosAppV10() }
     }
 }
