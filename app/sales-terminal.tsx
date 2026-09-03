@@ -81,38 +81,6 @@ export default function SalesTerminal() {
     try { setPendingCount((await getPendingOfflineSales()).length) } catch {}
   }, [])
 
-  const syncPending = useCallback(async () => {
-    if (!navigator.onLine) return
-    const pending = await getPendingOfflineSales()
-    if (!pending.length) { setPendingCount(0); return }
-    let synced = 0
-    for (const sale of pending) {
-      try {
-        const db = requireSupabase()
-        const { error } = await db.rpc('checkout_sale_multi_payment_v2', {
-          p_branch_id: sale.branchId,
-          p_location_id: sale.locationId,
-          p_customer_id: sale.customerId,
-          p_items: sale.items.map(item => ({ product_id: item.product.id, unit_id: item.product.base_unit_id, qty: item.qty, unit_price: item.unit_price })),
-          p_payments: [{ payment_method_id: sale.paymentMethodId, amount: Math.round(sale.total), cash_received: sale.cashReceived, provider: 'CASH' }],
-          p_discount_amount: Math.round(sale.discountAmount),
-          p_idempotency_key: sale.idempotencyKey,
-        })
-        if (error) throw error
-        await removeOfflineSale(sale.id)
-        synced++
-      } catch (e: any) {
-        toast('error', 'Sinkronisasi tertunda', e.message || 'Data offline belum bisa dikirim ke server.')
-        break
-      }
-    }
-    await refreshPending()
-    if (synced) {
-      await load(true)
-      toast('success', 'Data tersinkron', `${synced} transaksi offline berhasil dikirim ke Supabase.`)
-    }
-  }, [refreshPending, toast])
-
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
     try {
@@ -151,11 +119,38 @@ export default function SalesTerminal() {
         setProducts(cached.products || []); setCategories(cached.categories || []); setUnits(cached.units || []); setPrices(cached.prices || []); setStock(cached.stock || []); setBranchId(cached.branchId || ''); setLocationId(cached.locationId || ''); setCashMethodId(cached.cashMethodId || '')
         setOnline(false)
         if (e?.message !== 'OFFLINE_MODE') toast('info', 'Mode offline', 'Server tidak dapat dihubungi. Katalog dan stok lokal tetap digunakan sementara.')
-      } else {
-        toast('error', 'Gagal memuat data', e.message || 'Periksa koneksi Supabase.')
-      }
+      } else toast('error', 'Gagal memuat data', e.message || 'Periksa koneksi Supabase.')
     } finally { if (!silent) setLoading(false) }
   }, [toast])
+
+  const syncPending = useCallback(async () => {
+    if (!navigator.onLine) return
+    const pending = await getPendingOfflineSales()
+    if (!pending.length) { setPendingCount(0); return }
+    let synced = 0
+    for (const sale of pending) {
+      try {
+        const db = requireSupabase()
+        const { error } = await db.rpc('checkout_sale_multi_payment_v2', {
+          p_branch_id: sale.branchId,
+          p_location_id: sale.locationId,
+          p_customer_id: sale.customerId,
+          p_items: sale.items.map(item => ({ product_id: item.product.id, unit_id: item.product.base_unit_id, qty: item.qty, unit_price: item.unit_price })),
+          p_payments: [{ payment_method_id: sale.paymentMethodId, amount: Math.round(sale.total), cash_received: sale.cashReceived, provider: 'CASH' }],
+          p_discount_amount: Math.round(sale.discountAmount),
+          p_idempotency_key: sale.idempotencyKey,
+        })
+        if (error) throw error
+        await removeOfflineSale(sale.id)
+        synced++
+      } catch (e: any) {
+        toast('error', 'Sinkronisasi tertunda', e.message || 'Data offline belum bisa dikirim ke server.')
+        break
+      }
+    }
+    await refreshPending()
+    if (synced) { await load(true); toast('success', 'Data tersinkron', `${synced} transaksi offline berhasil dikirim ke Supabase.`) }
+  }, [load, refreshPending, toast])
 
   useEffect(() => {
     setOnline(navigator.onLine)
@@ -169,8 +164,7 @@ export default function SalesTerminal() {
     } catch {}
     const onOffline = () => { setOnline(false); toast('info', 'Koneksi offline', 'Penjualan akan disimpan lokal dan disinkronkan saat koneksi kembali.') }
     const onOnline = async () => { setOnline(true); toast('success', 'Koneksi kembali', 'Mencoba menyinkronkan transaksi lokal ke Supabase.'); await syncPending(); await load(true) }
-    window.addEventListener('offline', onOffline)
-    window.addEventListener('online', onOnline)
+    window.addEventListener('offline', onOffline); window.addEventListener('online', onOnline)
     return () => { window.removeEventListener('offline', onOffline); window.removeEventListener('online', onOnline) }
   }, [load, refreshPending, syncPending, toast])
 
@@ -181,8 +175,7 @@ export default function SalesTerminal() {
       if (e.key === 'F4' && cart.length) { e.preventDefault(); setShowPayment(true) }
       if (e.key === 'F7' && cart.length) { e.preventDefault(); holdOrder() }
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey)
   }, [cart.length])
 
   function add(product: Row) {
@@ -195,31 +188,23 @@ export default function SalesTerminal() {
   function changeQty(id: string, delta: number) { setCart(prev => prev.map(x => x.product.id === id ? { ...x, qty: Math.min(stockFor(id), Math.max(0, x.qty + delta)) } : x).filter(x => x.qty > 0)) }
   function setQty(id: string, raw: string) { const qty = Math.max(0, Math.min(stockFor(id), Number(raw) || 0)); setCart(prev => prev.map(x => x.product.id === id ? { ...x, qty } : x).filter(x => x.qty > 0)) }
   function clearCart() { setCart([]); setCash(''); setNote(''); setDiscount(''); setShowPayment(false) }
-  function holdOrder() {
-    if (!cart.length) return
-    const order: HeldOrder = { id: crypto.randomUUID(), name: `Pesanan ${heldOrders.length + 1}`, items: cart, note, createdAt: new Date().toISOString() }
-    const next = [order, ...heldOrders]; setHeldOrders(next); window.localStorage.setItem('qris-held-orders', JSON.stringify(next)); clearCart(); toast('success', 'Pesanan ditahan', 'Pesanan bisa dilanjutkan dari daftar pesanan ditahan.')
-  }
+  function holdOrder() { if (!cart.length) return; const order: HeldOrder = { id: crypto.randomUUID(), name: `Pesanan ${heldOrders.length + 1}`, items: cart, note, createdAt: new Date().toISOString() }; const next = [order, ...heldOrders]; setHeldOrders(next); window.localStorage.setItem('qris-held-orders', JSON.stringify(next)); clearCart(); toast('success', 'Pesanan ditahan', 'Pesanan bisa dilanjutkan dari daftar pesanan ditahan.') }
   function resumeOrder(order: HeldOrder) { setCart(order.items); setNote(order.note); const next = heldOrders.filter(x => x.id !== order.id); setHeldOrders(next); setShowHeld(false); window.localStorage.setItem('qris-held-orders', JSON.stringify(next)); toast('info', 'Pesanan dilanjutkan', `${order.name} kembali ke kasir.`) }
 
-  function localSaleFromCart(): OfflineSale {
-    return {
-      id: crypto.randomUUID(), branchId, locationId, customerId: null,
-      items: cart.map(({ product, qty }) => ({ product, qty, unit_price: priceFor(product, qty) })),
-      paymentMethodId: cashMethodId, total: Math.round(total), cashReceived: received,
-      discountAmount: Math.round(discountValue), note, idempotencyKey: crypto.randomUUID(), createdAt: new Date().toISOString(),
-    }
+  function localSaleFromCart(idempotencyKey?: string): OfflineSale {
+    return { id: crypto.randomUUID(), branchId, locationId, customerId: null, items: cart.map(({ product, qty }) => ({ product, qty, unit_price: priceFor(product, qty) })), paymentMethodId: cashMethodId, total: Math.round(total), cashReceived: received, discountAmount: Math.round(discountValue), note, idempotencyKey: idempotencyKey || crypto.randomUUID(), createdAt: new Date().toISOString() }
   }
 
-  async function checkoutOffline() {
+  async function checkoutOffline(idempotencyKey?: string) {
     if (!branchId || !locationId || !cashMethodId || received < total || !cart.length) return toast('error', 'Pembayaran belum lengkap', `Uang diterima harus minimal ${money(total)}.`)
     try {
-      const sale = localSaleFromCart()
+      const sale = localSaleFromCart(idempotencyKey)
       await enqueueOfflineSale(sale)
-      setStock(prev => prev.map(row => cart.some(item => item.product.id === row.product_id) ? { ...row, qty_base: Number(row.qty_base || 0) - (cart.find(item => item.product.id === row.product_id)?.qty || 0) } : row))
+      const nextStock = stock.map(row => cart.some(item => item.product.id === row.product_id) ? { ...row, qty_base: Number(row.qty_base || 0) - (cart.find(item => item.product.id === row.product_id)?.qty || 0) } : row)
+      setStock(nextStock)
+      await saveCatalogCache({ products, categories, units, prices, stock: nextStock, branchId, locationId, cashMethodId })
       setLastSale({ sale_no: `OFF-${new Date().toISOString().replace(/\D/g, '').slice(0, 14)}`, items: cart, received, subtotal, discountAmount: Math.round(discountValue), total, note, offline: true })
-      await refreshPending()
-      setShowPayment(false); setShowReceipt(true); clearCart()
+      await refreshPending(); setShowPayment(false); setShowReceipt(true); clearCart()
       toast('success', 'Transaksi tersimpan offline', 'Penjualan dan pengurangan stok disimpan di perangkat. Akan disinkronkan saat online.')
     } catch (e: any) { toast('error', 'Gagal menyimpan offline', e.message || 'Browser tidak mengizinkan penyimpanan lokal.') }
   }
@@ -228,22 +213,21 @@ export default function SalesTerminal() {
     if (!branchId || !locationId || !cashMethodId || received < total || !cart.length) return toast('error', 'Pembayaran belum lengkap', `Uang diterima harus minimal ${money(total)}.`)
     if (!navigator.onLine) return checkoutOffline()
     setSaving(true)
+    const idempotencyKey = crypto.randomUUID()
     try {
       const db = requireSupabase()
-      const payload = { p_branch_id: branchId, p_location_id: locationId, p_customer_id: null, p_items: cart.map(({ product, qty }) => ({ product_id: product.id, unit_id: product.base_unit_id, qty, unit_price: priceFor(product, qty) })), p_payments: [{ payment_method_id: cashMethodId, amount: Math.round(total), cash_received: received, provider: 'CASH' }], p_discount_amount: Math.round(discountValue), p_idempotency_key: crypto.randomUUID() }
+      const payload = { p_branch_id: branchId, p_location_id: locationId, p_customer_id: null, p_items: cart.map(({ product, qty }) => ({ product_id: product.id, unit_id: product.base_unit_id, qty, unit_price: priceFor(product, qty) })), p_payments: [{ payment_method_id: cashMethodId, amount: Math.round(total), cash_received: received, provider: 'CASH' }], p_discount_amount: Math.round(discountValue), p_idempotency_key: idempotencyKey }
       const { data, error: ce } = await db.rpc('checkout_sale_multi_payment_v2', payload)
       if (ce) throw ce
       const result = Array.isArray(data) ? data[0] : data
       if (!result) throw new Error('Transaksi tidak mengembalikan nomor transaksi.')
       setLastSale({ ...result, note, items: cart, received, subtotal, discountAmount: Math.round(discountValue), total })
-      setShowPayment(false); setShowReceipt(true); clearCart(); await load(true)
-      toast('success', 'Transaksi berhasil', `${result.sale_no} · ${money(total)}`)
+      setShowPayment(false); setShowReceipt(true); clearCart(); await load(true); toast('success', 'Transaksi berhasil', `${result.sale_no} · ${money(total)}`)
     } catch (e: any) {
       const message = e?.message || 'Transaksi tidak dapat diproses.'
-      if (/failed to fetch|networkerror|network request|fetch failed|offline|connection/i.test(message)) return checkoutOffline()
-      toast('error', 'Checkout gagal', message)
-    }
-    finally { setSaving(false) }
+      if (/failed to fetch|networkerror|network request|fetch failed|offline|connection/i.test(message)) await checkoutOffline(idempotencyKey)
+      else toast('error', 'Checkout gagal', message)
+    } finally { setSaving(false) }
   }
 
   function printReceipt() {
