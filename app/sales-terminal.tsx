@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { requireSupabase } from '../lib/supabase'
+import { enqueueOfflineSale, getCatalogCache, getPendingOfflineSales, removeOfflineSale, saveCatalogCache, type OfflineSale } from '../lib/offline-pos'
 import styles from './sales.module.css'
 
 type Row = Record<string, any>
@@ -44,6 +45,8 @@ export default function SalesTerminal() {
   const [loading, setLoading] = useState(true)
   const [toasts, setToasts] = useState<Toast[]>([])
   const [mode, setMode] = useState<ViewMode>('retail')
+  const [online, setOnline] = useState(true)
+  const [pendingCount, setPendingCount] = useState(0)
   const searchRef = useRef<HTMLInputElement>(null)
   const catalogRef = useRef<HTMLDivElement>(null)
   const toastId = useRef(0)
@@ -64,6 +67,7 @@ export default function SalesTerminal() {
   const total = Math.max(0, subtotal - discountValue)
   const received = Number(cash || 0)
   const change = received - total
+  const modeLabel = modes.find(x => x.id === mode)?.label || 'Retail'
 
   const shown = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -73,9 +77,46 @@ export default function SalesTerminal() {
     })
   }, [products, search, categoryFilter, categoryName])
 
+  const refreshPending = useCallback(async () => {
+    try { setPendingCount((await getPendingOfflineSales()).length) } catch {}
+  }, [])
+
+  const syncPending = useCallback(async () => {
+    if (!navigator.onLine) return
+    const pending = await getPendingOfflineSales()
+    if (!pending.length) { setPendingCount(0); return }
+    let synced = 0
+    for (const sale of pending) {
+      try {
+        const db = requireSupabase()
+        const { error } = await db.rpc('checkout_sale_multi_payment_v2', {
+          p_branch_id: sale.branchId,
+          p_location_id: sale.locationId,
+          p_customer_id: sale.customerId,
+          p_items: sale.items.map(item => ({ product_id: item.product.id, unit_id: item.product.base_unit_id, qty: item.qty, unit_price: item.unit_price })),
+          p_payments: [{ payment_method_id: sale.paymentMethodId, amount: Math.round(sale.total), cash_received: sale.cashReceived, provider: 'CASH' }],
+          p_discount_amount: Math.round(sale.discountAmount),
+          p_idempotency_key: sale.idempotencyKey,
+        })
+        if (error) throw error
+        await removeOfflineSale(sale.id)
+        synced++
+      } catch (e: any) {
+        toast('error', 'Sinkronisasi tertunda', e.message || 'Data offline belum bisa dikirim ke server.')
+        break
+      }
+    }
+    await refreshPending()
+    if (synced) {
+      await load(true)
+      toast('success', 'Data tersinkron', `${synced} transaksi offline berhasil dikirim ke Supabase.`)
+    }
+  }, [refreshPending, toast])
+
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
     try {
+      if (!navigator.onLine) throw new Error('OFFLINE_MODE')
       const db = requireSupabase()
       const { data: businesses, error: be } = await db.from('businesses').select('*').eq('code', 'TOKO_MAJU_JAYA').limit(1)
       if (be) throw be
@@ -89,36 +130,49 @@ export default function SalesTerminal() {
         db.from('branches').select('*').eq('business_id', business.id).eq('is_active', true).limit(1),
       ])
       if (pe || ce || ue || se || bre) throw pe || ce || ue || se || bre
-      setProducts(ps || []); setCategories(cs || []); setUnits(us || []); setStock(bs || [])
       const branch = branches?.[0]
       if (!branch) throw new Error('Cabang aktif tidak ditemukan.')
-      setBranchId(branch.id)
       const { data: locations, error: le } = await db.from('locations').select('*').eq('branch_id', branch.id).eq('is_active', true).limit(1)
       if (le) throw le
-      setLocationId(locations?.[0]?.id || '')
+      const locationIdNext = locations?.[0]?.id || ''
       const { data: pls, error: ple } = await db.from('price_lists').select('*').eq('business_id', business.id).eq('is_default', true).eq('is_active', true).limit(1)
       if (ple) throw ple
       const pl = pls?.[0]
       const { data: prs, error: pre } = pl ? await db.from('product_prices').select('*').eq('price_list_id', pl.id) : { data: [], error: null }
       if (pre) throw pre
-      setPrices(prs || [])
       const { data: methods, error: me } = await db.from('payment_methods').select('*').eq('business_id', business.id).eq('code', 'CASH').eq('is_active', true).limit(1)
       if (me) throw me
-      setCashMethodId(methods?.[0]?.id || '')
+      const cashMethodIdNext = methods?.[0]?.id || ''
+      setProducts(ps || []); setCategories(cs || []); setUnits(us || []); setStock(bs || []); setBranchId(branch.id); setLocationId(locationIdNext); setPrices(prs || []); setCashMethodId(cashMethodIdNext); setOnline(true)
+      await saveCatalogCache({ products: ps || [], categories: cs || [], units: us || [], prices: prs || [], stock: bs || [], branchId: branch.id, locationId: locationIdNext, cashMethodId: cashMethodIdNext })
     } catch (e: any) {
-      toast('error', 'Gagal memuat data', e.message || 'Periksa koneksi Supabase.')
+      const cached = await getCatalogCache().catch(() => null)
+      if (cached) {
+        setProducts(cached.products || []); setCategories(cached.categories || []); setUnits(cached.units || []); setPrices(cached.prices || []); setStock(cached.stock || []); setBranchId(cached.branchId || ''); setLocationId(cached.locationId || ''); setCashMethodId(cached.cashMethodId || '')
+        setOnline(false)
+        if (e?.message !== 'OFFLINE_MODE') toast('info', 'Mode offline', 'Server tidak dapat dihubungi. Katalog dan stok lokal tetap digunakan sementara.')
+      } else {
+        toast('error', 'Gagal memuat data', e.message || 'Periksa koneksi Supabase.')
+      }
     } finally { if (!silent) setLoading(false) }
   }, [toast])
 
   useEffect(() => {
+    setOnline(navigator.onLine)
     load()
+    refreshPending()
     try {
       const savedHeld = window.localStorage.getItem('qris-held-orders')
       if (savedHeld) setHeldOrders(JSON.parse(savedHeld))
       const savedMode = window.localStorage.getItem('qris-view-mode') as ViewMode | null
       if (savedMode && modes.some(x => x.id === savedMode)) setMode(savedMode)
     } catch {}
-  }, [load])
+    const onOffline = () => { setOnline(false); toast('info', 'Koneksi offline', 'Penjualan akan disimpan lokal dan disinkronkan saat koneksi kembali.') }
+    const onOnline = async () => { setOnline(true); toast('success', 'Koneksi kembali', 'Mencoba menyinkronkan transaksi lokal ke Supabase.'); await syncPending(); await load(true) }
+    window.addEventListener('offline', onOffline)
+    window.addEventListener('online', onOnline)
+    return () => { window.removeEventListener('offline', onOffline); window.removeEventListener('online', onOnline) }
+  }, [load, refreshPending, syncPending, toast])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -148,8 +202,31 @@ export default function SalesTerminal() {
   }
   function resumeOrder(order: HeldOrder) { setCart(order.items); setNote(order.note); const next = heldOrders.filter(x => x.id !== order.id); setHeldOrders(next); setShowHeld(false); window.localStorage.setItem('qris-held-orders', JSON.stringify(next)); toast('info', 'Pesanan dilanjutkan', `${order.name} kembali ke kasir.`) }
 
+  function localSaleFromCart(): OfflineSale {
+    return {
+      id: crypto.randomUUID(), branchId, locationId, customerId: null,
+      items: cart.map(({ product, qty }) => ({ product, qty, unit_price: priceFor(product, qty) })),
+      paymentMethodId: cashMethodId, total: Math.round(total), cashReceived: received,
+      discountAmount: Math.round(discountValue), note, idempotencyKey: crypto.randomUUID(), createdAt: new Date().toISOString(),
+    }
+  }
+
+  async function checkoutOffline() {
+    if (!branchId || !locationId || !cashMethodId || received < total || !cart.length) return toast('error', 'Pembayaran belum lengkap', `Uang diterima harus minimal ${money(total)}.`)
+    try {
+      const sale = localSaleFromCart()
+      await enqueueOfflineSale(sale)
+      setStock(prev => prev.map(row => cart.some(item => item.product.id === row.product_id) ? { ...row, qty_base: Number(row.qty_base || 0) - (cart.find(item => item.product.id === row.product_id)?.qty || 0) } : row))
+      setLastSale({ sale_no: `OFF-${new Date().toISOString().replace(/\D/g, '').slice(0, 14)}`, items: cart, received, subtotal, discountAmount: Math.round(discountValue), total, note, offline: true })
+      await refreshPending()
+      setShowPayment(false); setShowReceipt(true); clearCart()
+      toast('success', 'Transaksi tersimpan offline', 'Penjualan dan pengurangan stok disimpan di perangkat. Akan disinkronkan saat online.')
+    } catch (e: any) { toast('error', 'Gagal menyimpan offline', e.message || 'Browser tidak mengizinkan penyimpanan lokal.') }
+  }
+
   async function checkout() {
     if (!branchId || !locationId || !cashMethodId || received < total || !cart.length) return toast('error', 'Pembayaran belum lengkap', `Uang diterima harus minimal ${money(total)}.`)
+    if (!navigator.onLine) return checkoutOffline()
     setSaving(true)
     try {
       const db = requireSupabase()
@@ -161,14 +238,18 @@ export default function SalesTerminal() {
       setLastSale({ ...result, note, items: cart, received, subtotal, discountAmount: Math.round(discountValue), total })
       setShowPayment(false); setShowReceipt(true); clearCart(); await load(true)
       toast('success', 'Transaksi berhasil', `${result.sale_no} · ${money(total)}`)
-    } catch (e: any) { toast('error', 'Checkout gagal', e.message || 'Transaksi tidak dapat diproses.') }
+    } catch (e: any) {
+      const message = e?.message || 'Transaksi tidak dapat diproses.'
+      if (/failed to fetch|networkerror|network request|fetch failed|offline|connection/i.test(message)) return checkoutOffline()
+      toast('error', 'Checkout gagal', message)
+    }
     finally { setSaving(false) }
   }
 
   function printReceipt() {
     if (!lastSale) return
     const rows = lastSale.items.map((x: CartItem) => `<tr><td>${text(x.product.name)}</td><td>${x.qty}</td><td>${money(priceFor(x.product, x.qty))}</td><td>${money(priceFor(x.product, x.qty) * x.qty)}</td></tr>`).join('')
-    const html = `<!doctype html><html><head><title>${text(lastSale.sale_no)}</title><style>body{font:12px monospace;width:280px;margin:16px auto;color:#111}h2{text-align:center;margin:0 0 8px}table{width:100%;border-collapse:collapse}td{padding:4px 0;border-bottom:1px dashed #bbb}td:nth-child(n+2){text-align:right}.line{display:flex;justify-content:space-between;padding:3px 0}.total{font-size:16px;font-weight:bold;border-top:1px solid #111;margin-top:6px;padding-top:7px}.center{text-align:center;color:#555}</style></head><body><h2>TOKO MAJU JAYA</h2><div class="center">${text(lastSale.sale_no)}<br>${new Date().toLocaleString('id-ID')}</div><hr><table>${rows}</table><div class="line"><span>Subtotal</span><span>${money(lastSale.subtotal)}</span></div><div class="line"><span>Diskon</span><span>-${money(lastSale.discountAmount)}</span></div><div class="line total"><span>TOTAL</span><span>${money(lastSale.total)}</span></div><div class="line"><span>Bayar</span><span>${money(lastSale.received)}</span></div><div class="line"><span>Kembali</span><span>${money(lastSale.received-lastSale.total)}</span></div>${lastSale.note ? `<p>Catatan: ${text(lastSale.note)}</p>` : ''}<hr><div class="center">Terima kasih</div><script>window.print()</script></body></html>`
+    const html = `<!doctype html><html><head><title>${text(lastSale.sale_no)}</title><style>body{font:12px monospace;width:280px;margin:16px auto;color:#111}h2{text-align:center;margin:0 0 8px}table{width:100%;border-collapse:collapse}td{padding:4px 0;border-bottom:1px dashed #bbb}td:nth-child(n+2){text-align:right}.line{display:flex;justify-content:space-between;padding:3px 0}.total{font-size:16px;font-weight:bold;border-top:1px solid #111;margin-top:6px;padding-top:7px}.center{text-align:center;color:#555}</style></head><body><h2>TOKO MAJU JAYA</h2><div class="center">${text(lastSale.sale_no)}<br>${new Date().toLocaleString('id-ID')}</div><hr><table>${rows}</table><div class="line"><span>Subtotal</span><span>${money(lastSale.subtotal)}</span></div><div class="line"><span>Diskon</span><span>-${money(lastSale.discountAmount)}</span></div><div class="line total"><span>TOTAL</span><span>${money(lastSale.total)}</span></div><div class="line"><span>Bayar</span><span>${money(lastSale.received)}</span></div><div class="line"><span>Kembali</span><span>${money(lastSale.received-lastSale.total)}</span></div>${lastSale.note ? `<p>Catatan: ${text(lastSale.note)}</p>` : ''}<hr><div class="center">${lastSale.offline ? 'Tersimpan offline · akan disinkronkan' : 'Terima kasih'}</div><script>window.print()</script></body></html>`
     const win = window.open('', '_blank', 'width=380,height=650')
     if (!win) return toast('error', 'Cetak gagal', 'Popup diblokir browser. Izinkan popup untuk mencetak struk.')
     win.document.write(html); win.document.close()
@@ -177,20 +258,20 @@ export default function SalesTerminal() {
   const quickCash = [total, Math.ceil(total / 10000) * 10000, Math.ceil(total / 50000) * 50000, Math.ceil(total / 100000) * 100000].filter((v, i, a) => v > 0 && a.indexOf(v) === i)
 
   return <div className={styles.root}>
-    <header className={styles.topbar}><div><span className={styles.eyebrow}>TOKO MAJU JAYA · POINT OF SALE</span><h1>Penjualan</h1></div><div className={styles.headerActions}><div className={styles.modeSwitch}>{modes.map(m => <button key={m.id} className={mode === m.id ? styles.active : ''} onClick={() => { setMode(m.id); window.localStorage.setItem('qris-view-mode', m.id); toast('info', 'Mode tampilan', `${m.label} dipilih.`) }}><span>{m.icon}</span>{m.label}</button>)}</div><div className={styles.branch}>● Cabang Utama</div><div className={styles.avatar}>TJ</div></div></header>
+    <header className={styles.topbar}><div><span className={styles.eyebrow}>TOKO MAJU JAYA · POINT OF SALE</span><h1>Penjualan</h1></div><div className={styles.headerActions}><div className={`${styles.connectionPill} ${online ? styles.connectionOnline : styles.connectionOffline}`}><span>●</span>{online ? 'Online' : 'Offline'}{pendingCount > 0 && <b>{pendingCount} tertunda</b>}</div><div className={styles.modeBadge}>{modeLabel}</div><div className={styles.branch}>● Cabang Utama</div><div className={styles.avatar}>TJ</div></div></header>
     <div className={styles.toolbar}><div className={styles.search}><span>⌕</span><input ref={searchRef} value={search} onChange={e => setSearch(e.target.value)} placeholder="Scan barcode atau cari produk, SKU..." autoComplete="off" /><kbd>Ctrl K</kbd></div><select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}><option value="">Semua kategori</option>{categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select><button onClick={() => setShowHeld(true)}>Ditahan <b>{heldOrders.length}</b></button></div>
-    <div className={styles.layout}><section className={styles.catalogPanel}><div className={styles.sectionHead}><div><h2>Daftar Produk</h2><span>{shown.length} produk · klik kartu untuk menambah</span></div><strong>● LIVE</strong></div>{loading ? <div className={styles.empty}>Memuat katalog...</div> : shown.length === 0 ? <div className={styles.empty}>Produk tidak ditemukan.</div> : <div className={styles.catalog} ref={catalogRef}>{shown.map(p => { const s = stockFor(p.id); return <button className={styles.product} key={p.id} onClick={() => add(p)} disabled={s <= 0}><div className={styles.productArt}>{text(p.name).slice(0,1).toUpperCase()}</div><div className={styles.productInfo}><div className={styles.productTop}><span>{categoryName(p.category_id)}</span><small>{s <= 0 ? 'Habis' : `Stok ${number(s)}`}</small></div><strong>{p.name}</strong><em>{p.sku || 'Tanpa SKU'} · {unitName(p.base_unit_id)}</em><div className={styles.productBottom}><b>{money(priceFor(p,1))}</b><i>＋</i></div></div></button> })}</div>}</section>
+    <div className={styles.layout}><section className={styles.catalogPanel}><div className={styles.sectionHead}><div><h2>Daftar Produk</h2><span>{shown.length} produk · klik kartu untuk menambah</span></div><strong>{online ? '● LIVE' : '● LOCAL'}</strong></div>{loading ? <div className={styles.empty}>Memuat katalog...</div> : shown.length === 0 ? <div className={styles.empty}>Produk tidak ditemukan.</div> : <div className={styles.catalog} ref={catalogRef}>{shown.map(p => { const s = stockFor(p.id); return <button className={styles.product} key={p.id} onClick={() => add(p)} disabled={s <= 0}><div className={styles.productArt}>{text(p.name).slice(0,1).toUpperCase()}</div><div className={styles.productInfo}><div className={styles.productTop}><span>{categoryName(p.category_id)}</span><small>{s <= 0 ? 'Habis' : `Stok ${number(s)}`}</small></div><strong>{p.name}</strong><em>{p.sku || 'Tanpa SKU'} · {unitName(p.base_unit_id)}</em><div className={styles.productBottom}><b>{money(priceFor(p,1))}</b><i>＋</i></div></div></button> })}</div>}</section>
       <section className={styles.cart}><div className={styles.sectionHead}><div><h2>Pesanan</h2><span>{totalQty} item · {cart.length} produk</span></div>{cart.length > 0 && <button className={styles.clear} onClick={clearCart}>Kosongkan</button>}</div><div className={styles.cartList}>{cart.length === 0 ? <div className={styles.cartEmpty}><div>＋</div><strong>Belum ada pesanan</strong><span>Pilih produk dari katalog untuk memulai transaksi.</span></div> : cart.map(item => <div className={styles.cartRow} key={item.product.id}><div className={styles.miniArt}>{text(item.product.name).slice(0,1).toUpperCase()}</div><div className={styles.cartProduct}><strong>{item.product.name}</strong><span>{money(priceFor(item.product,item.qty))} / {unitName(item.product.base_unit_id)}</span><div className={styles.qty}><button onClick={() => changeQty(item.product.id,-1)}>−</button><input value={item.qty} onChange={e => setQty(item.product.id,e.target.value)} inputMode="numeric" /><button onClick={() => changeQty(item.product.id,1)}>+</button></div></div><b>{money(priceFor(item.product,item.qty)*item.qty)}</b></div>)}</div><div className={styles.cartTools}><button onClick={holdOrder} disabled={!cart.length}>Tahan <kbd>F7</kbd></button><button onClick={() => setNote(note ? '' : ' ')} disabled={!cart.length}>Catatan</button></div>{note !== '' && <input className={styles.note} value={note} onChange={e => setNote(e.target.value)} placeholder="Catatan, contoh: tanpa es" autoFocus />}
         <div className={styles.discount}><div><strong>Diskon transaksi</strong><span>Potongan dari subtotal</span></div><div className={styles.discountControl}><div><button className={discountMode === 'percent' ? styles.active : ''} onClick={() => setDiscountMode('percent')}>%</button><button className={discountMode === 'amount' ? styles.active : ''} onClick={() => setDiscountMode('amount')}>Rp</button></div><input value={discount} onChange={e => setDiscount(e.target.value.replace(/[^0-9.]/g,''))} inputMode="decimal" placeholder="0" /></div></div>
-        <div className={styles.checkout}><div><span>Subtotal</span><b>{money(subtotal)}</b></div>{discountValue > 0 && <div className={styles.discountLine}><span>Diskon {discountMode === 'percent' ? `(${discount}%)` : ''}</span><b>-{money(discountValue)}</b></div>}<div className={styles.totalLine}><span>Total</span><strong>{money(total)}</strong></div><button className={styles.pay} disabled={!cart.length || !branchId || !locationId || !cashMethodId} onClick={() => setShowPayment(true)}>Bayar <b>{money(total)}</b></button><small>F4 untuk pembayaran · harga & stok divalidasi server</small></div></section></div>
+        <div className={styles.checkout}><div><span>Subtotal</span><b>{money(subtotal)}</b></div>{discountValue > 0 && <div className={styles.discountLine}><span>Diskon {discountMode === 'percent' ? `(${discount}%)` : ''}</span><b>-{money(discountValue)}</b></div>}<div className={styles.totalLine}><span>Total</span><strong>{money(total)}</strong></div><button className={styles.pay} disabled={!cart.length || !branchId || !locationId || !cashMethodId} onClick={() => setShowPayment(true)}>Bayar <b>{money(total)}</b></button><small>{online ? 'F4 untuk pembayaran · harga & stok divalidasi server' : 'F4 untuk pembayaran · transaksi disimpan lokal sampai online'}</small></div></section></div>
 
-    {showPayment && <div className={styles.backdrop} onMouseDown={() => setShowPayment(false)}><div className={styles.modalWide} onMouseDown={e => e.stopPropagation()}><div className={styles.modalHead}><div><span className={styles.eyebrow}>CHECKOUT</span><h2>Pembayaran & preview struk</h2><p>Periksa nominal sebelum transaksi disimpan.</p></div><button onClick={() => setShowPayment(false)}>×</button></div><div className={styles.paymentGrid}><div><div className={styles.paymentTotal}><span>Total tagihan</span><strong>{money(total)}</strong></div><label>Uang diterima<input autoFocus value={cash} onChange={e => setCash(e.target.value.replace(/\D/g,''))} inputMode="numeric" placeholder="0" /></label><div className={styles.quickCash}>{quickCash.map(v => <button key={v} onClick={() => setCash(String(v))}>{money(v)}</button>)}</div><div className={`${styles.change} ${received >= total ? styles.good : styles.warn}`}><span>{received >= total ? 'Kembalian' : `Kurang ${money(total-received)}`}</span><strong>{received >= total ? money(change) : money(0)}</strong></div><button className={styles.pay} disabled={saving || received < total || !cart.length} onClick={checkout}>{saving ? 'Memproses...' : `Selesaikan ${money(total)}`}</button></div><ReceiptPreview sale={{sale_no:'DRAFT',items:cart,subtotal,discountAmount:Math.round(discountValue),total,received}} priceFor={priceFor}/></div></div></div>}
+    {showPayment && <div className={styles.backdrop} onMouseDown={() => setShowPayment(false)}><div className={styles.modalWide} onMouseDown={e => e.stopPropagation()}><div className={styles.modalHead}><div><span className={styles.eyebrow}>CHECKOUT · {online ? 'ONLINE' : 'OFFLINE'}</span><h2>Pembayaran & preview struk</h2><p>{online ? 'Periksa nominal sebelum transaksi disimpan ke Supabase.' : 'Periksa nominal. Transaksi akan disimpan di perangkat dan disinkronkan otomatis saat online.'}</p></div><button onClick={() => setShowPayment(false)}>×</button></div><div className={styles.paymentGrid}><div><div className={styles.paymentTotal}><span>Total tagihan</span><strong>{money(total)}</strong></div><label>Uang diterima<input autoFocus value={cash} onChange={e => setCash(e.target.value.replace(/\D/g,''))} inputMode="numeric" placeholder="0" /></label><div className={styles.quickCash}>{quickCash.map(v => <button key={v} onClick={() => setCash(String(v))}>{money(v)}</button>)}</div><div className={`${styles.change} ${received >= total ? styles.good : styles.warn}`}><span>{received >= total ? 'Kembalian' : `Kurang ${money(total-received)}`}</span><strong>{received >= total ? money(change) : money(0)}</strong></div><button className={styles.pay} disabled={saving || received < total || !cart.length} onClick={checkout}>{saving ? 'Memproses...' : online ? `Selesaikan ${money(total)}` : `Simpan offline ${money(total)}`}</button></div><ReceiptPreview sale={{sale_no:'DRAFT',items:cart,subtotal,discountAmount:Math.round(discountValue),total,received}} priceFor={priceFor}/></div></div></div>}
     {showHeld && <div className={styles.backdrop} onMouseDown={() => setShowHeld(false)}><div className={styles.modal} onMouseDown={e => e.stopPropagation()}><div className={styles.modalHead}><div><span className={styles.eyebrow}>ANTRIAN</span><h2>Pesanan ditahan</h2></div><button onClick={() => setShowHeld(false)}>×</button></div>{heldOrders.length === 0 ? <div className={styles.empty}>Tidak ada pesanan yang ditahan.</div> : <div className={styles.heldList}>{heldOrders.map(o => <div className={styles.held} key={o.id}><div><strong>{o.name}</strong><span>{o.items.reduce((s,x)=>s+x.qty,0)} item · {new Date(o.createdAt).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})}</span></div><button onClick={() => resumeOrder(o)}>Lanjutkan</button></div>)}</div>}</div></div>}
-    {showReceipt && lastSale && <div className={styles.backdrop} onMouseDown={() => setShowReceipt(false)}><div className={styles.receiptModal} onMouseDown={e => e.stopPropagation()}><div className={styles.modalHead}><div><span className={styles.eyebrow}>TRANSAKSI SELESAI</span><h2>{lastSale.sale_no}</h2><p>Pembayaran berhasil dan stok sudah diproses.</p></div><button onClick={() => setShowReceipt(false)}>×</button></div><ReceiptPreview sale={lastSale} priceFor={priceFor}/><div className={styles.receiptActions}><button onClick={() => setShowReceipt(false)}>Transaksi baru</button><button className={styles.pay} onClick={printReceipt}>Cetak struk</button></div></div></div>}
+    {showReceipt && lastSale && <div className={styles.backdrop} onMouseDown={() => setShowReceipt(false)}><div className={styles.receiptModal} onMouseDown={e => e.stopPropagation()}><div className={styles.modalHead}><div><span className={styles.eyebrow}>{lastSale.offline ? 'TERSIMPAN LOKAL' : 'TRANSAKSI SELESAI'}</span><h2>{lastSale.sale_no}</h2><p>{lastSale.offline ? 'Transaksi tersimpan di perangkat. Stok lokal sudah dikurangi dan transaksi akan dikirim saat online.' : 'Pembayaran berhasil dan stok sudah diproses.'}</p></div><button onClick={() => setShowReceipt(false)}>×</button></div><ReceiptPreview sale={lastSale} priceFor={priceFor}/><div className={styles.receiptActions}><button onClick={() => setShowReceipt(false)}>Transaksi baru</button><button className={styles.pay} onClick={printReceipt}>Cetak struk</button></div></div></div>}
     <div className={styles.toastStack}>{toasts.map(t => <div className={`${styles.toast} ${styles[t.type]}`} key={t.id}><div className={styles.toastIcon}>{t.type==='success'?'✓':t.type==='error'?'!':'i'}</div><div><b>{t.title}</b><span>{t.text}</span></div><button onClick={() => dismissToast(t.id)}>×</button></div>)}</div>
   </div>
 }
 
 function ReceiptPreview({ sale, priceFor }: { sale: any; priceFor: (product: Row, qty: number) => number }) {
-  return <div className={styles.receiptPreview}><div className={styles.receiptPaper}><div className={styles.receiptCenter}><strong>TOKO MAJU JAYA</strong><span>POS QRIS · Cabang Utama</span><small>{sale.sale_no} · {new Date().toLocaleString('id-ID')}</small></div><div className={styles.rule}/>{(sale.items || []).map((x: CartItem, i: number) => <div className={styles.receiptItem} key={`${x.product.id}-${i}`}><div><b>{x.product.name}</b><span>{x.qty} × {money(priceFor(x.product,x.qty))}</span></div><strong>{money(priceFor(x.product,x.qty)*x.qty)}</strong></div>)}<div className={styles.rule}/><div className={styles.receiptLine}><span>Subtotal</span><b>{money(sale.subtotal)}</b></div><div className={styles.receiptLine}><span>Diskon</span><b>-{money(sale.discountAmount || 0)}</b></div><div className={styles.grand}><span>TOTAL</span><b>{money(sale.total)}</b></div>{sale.received > 0 && <><div className={styles.receiptLine}><span>Tunai</span><b>{money(sale.received)}</b></div><div className={styles.receiptLine}><span>Kembalian</span><b>{money(Math.max(0,sale.received-sale.total))}</b></div></>}{sale.note && <div className={styles.receiptNote}>Catatan: {sale.note.trim()}</div>}<div className={styles.receiptCenter}><small>Terima kasih atas kunjungan Anda.</small></div></div></div>
+  return <div className={styles.receiptPreview}><div className={styles.receiptPaper}><div className={styles.receiptCenter}><strong>TOKO MAJU JAYA</strong><span>POS QRIS · Cabang Utama</span><small>{sale.sale_no} · {new Date().toLocaleString('id-ID')}</small></div><div className={styles.rule}/>{(sale.items || []).map((x: CartItem, i: number) => <div className={styles.receiptItem} key={`${x.product.id}-${i}`}><div><b>{x.product.name}</b><span>{x.qty} × {money(priceFor(x.product,x.qty))}</span></div><strong>{money(priceFor(x.product,x.qty)*x.qty)}</strong></div>)}<div className={styles.rule}/><div className={styles.receiptLine}><span>Subtotal</span><b>{money(sale.subtotal)}</b></div><div className={styles.receiptLine}><span>Diskon</span><b>-{money(sale.discountAmount || 0)}</b></div><div className={styles.grand}><span>TOTAL</span><b>{money(sale.total)}</b></div>{sale.received > 0 && <><div className={styles.receiptLine}><span>Tunai</span><b>{money(sale.received)}</b></div><div className={styles.receiptLine}><span>Kembalian</span><b>{money(Math.max(0,sale.received-sale.total))}</b></div></>}{sale.note && <div className={styles.receiptNote}>Catatan: {sale.note.trim()}</div>}<div className={styles.receiptCenter}><small>{sale.offline ? 'Tersimpan lokal · menunggu sinkronisasi' : 'Terima kasih atas kunjungan Anda.'}</small></div></div></div>
 }
