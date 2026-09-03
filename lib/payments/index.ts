@@ -2,10 +2,11 @@
 
 export { PAYMENT_METHODS, getPaymentMethod } from './paymentMethods'
 export type { PaymentMethodCode, PaymentMethodDefinition, PaymentMethodAvailability } from './paymentMethods'
+export type PaymentCode = import('./paymentMethods').PaymentMethodCode
 
 export type CheckoutPaymentInput = {
   payment_method_id: string
-  code: import('./paymentMethods').PaymentMethodCode
+  code: PaymentCode
   amount: number
   cash_received?: number
   reference?: string
@@ -13,11 +14,11 @@ export type CheckoutPaymentInput = {
   status?: 'PAID' | 'PENDING'
 }
 
-export function isOfflinePayment(code: import('./paymentMethods').PaymentMethodCode) {
+export function isOfflinePayment(code: PaymentCode) {
   return code === 'CASH' || code === 'RECEIVABLE'
 }
 
-export function normalizePaymentCode(code: string): import('./paymentMethods').PaymentMethodCode {
+export function normalizePaymentCode(code: string): PaymentCode {
   if (code === 'PIUTANG' || code === 'RECEIVABLE' || code === 'AR') return 'RECEIVABLE'
   if (code === 'QRIS') return 'QRIS'
   if (code === 'TRANSFER' || code === 'BANK_TRANSFER') return 'TRANSFER'
