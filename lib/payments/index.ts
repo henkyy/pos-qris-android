@@ -1,10 +1,11 @@
 'use client'
 
-export type PaymentCode = 'CASH' | 'QRIS' | 'TRANSFER' | 'RECEIVABLE'
+export { PAYMENT_METHODS, getPaymentMethod } from './paymentMethods'
+export type { PaymentMethodCode, PaymentMethodDefinition, PaymentMethodAvailability } from './paymentMethods'
 
 export type CheckoutPaymentInput = {
   payment_method_id: string
-  code: PaymentCode
+  code: import('./paymentMethods').PaymentMethodCode
   amount: number
   cash_received?: number
   reference?: string
@@ -12,18 +13,11 @@ export type CheckoutPaymentInput = {
   status?: 'PAID' | 'PENDING'
 }
 
-export const PAYMENT_METHODS: Array<{ code: PaymentCode; name: string; offline: boolean; description: string }> = [
-  { code: 'CASH', name: 'Tunai', offline: true, description: 'Bayar langsung dan bisa diproses tanpa koneksi.' },
-  { code: 'RECEIVABLE', name: 'Piutang', offline: true, description: 'Catat sebagai piutang pelanggan dan sinkronkan saat online.' },
-  { code: 'QRIS', name: 'QRIS', offline: false, description: 'Menunggu konfirmasi dari integrasi/provider QRIS.' },
-  { code: 'TRANSFER', name: 'Transfer', offline: false, description: 'Catat transfer sebagai pending sampai diverifikasi.' },
-]
-
-export function isOfflinePayment(code: PaymentCode) {
+export function isOfflinePayment(code: import('./paymentMethods').PaymentMethodCode) {
   return code === 'CASH' || code === 'RECEIVABLE'
 }
 
-export function normalizePaymentCode(code: string): PaymentCode {
+export function normalizePaymentCode(code: string): import('./paymentMethods').PaymentMethodCode {
   if (code === 'PIUTANG' || code === 'RECEIVABLE' || code === 'AR') return 'RECEIVABLE'
   if (code === 'QRIS') return 'QRIS'
   if (code === 'TRANSFER' || code === 'BANK_TRANSFER') return 'TRANSFER'
