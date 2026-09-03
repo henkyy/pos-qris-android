@@ -15,11 +15,11 @@ export type OfflineSale = {
   customerId: string | null
   items: OfflineCartItem[]
   paymentMethodId: string
-  paymentCode: OfflinePaymentCode
+  paymentCode?: OfflinePaymentCode
   total: number
   cashReceived: number
-  reference: string
-  provider: string | null
+  reference?: string
+  provider?: string | null
   discountAmount: number
   note: string
   idempotencyKey: string
@@ -35,7 +35,8 @@ type CatalogCache = {
   branchId: string
   locationId: string
   cashMethodId: string
-  paymentMethods: Record<string, any>[]
+  paymentMethods?: Record<string, any>[]
+  customers?: Record<string, any>[]
   cachedAt: string
 }
 
