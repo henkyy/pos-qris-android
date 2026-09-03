@@ -118,6 +118,9 @@ export default function SalesTerminal() {
       const savedMode = window.localStorage.getItem('qris-view-mode') as ViewMode | null
       if (savedMode && modes.some(x => x.id === savedMode)) setMode(savedMode)
     } catch {}
+  }, [load])
+
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); searchRef.current?.focus() }
       if (e.key === 'Escape') { setShowPayment(false); setShowHeld(false); setShowReceipt(false) }
@@ -126,7 +129,7 @@ export default function SalesTerminal() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [load, cart.length])
+  }, [cart.length])
 
   function add(product: Row) {
     const scroll = catalogRef.current?.scrollTop || 0
