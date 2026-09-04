@@ -1,0 +1,67 @@
+name: Temporary workspace safety
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Patch safety edges
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new, count=1):
+              p = Path(path)
+              s = p.read_text()
+              if old not in s:
+                  raise SystemExit(f'Pattern not found in {path}: {old[:160]!r}')
+              p.write_text(s.replace(old, new, count))
+
+          # Do not make dashboard/reports unusable when a branch has no stock location yet.
+          replace('features/reports/index.tsx',
+              "if (!activeLocationId) throw new Error(`Lokasi stok aktif untuk cabang ${String(branch.name || branch.code || branch.id)} tidak ditemukan.`)",
+              "if (!activeLocationId) console.warn(`Lokasi stok aktif untuk cabang ${String(branch.name || branch.code || branch.id)} belum dikonfigurasi.`)")
+          replace('features/reports/index.tsx',
+              "db.from('stock_balances').select('product_id,location_id,qty_base,reserved_qty').eq('location_id', activeLocationId).limit(3000),",
+              "activeLocationId ? db.from('stock_balances').select('product_id,location_id,qty_base,reserved_qty').eq('location_id', activeLocationId).limit(3000) : Promise.resolve({ data: [], error: null }),")
+          replace('features/dashboard/index.tsx',
+              "if (!activeLocationId) throw new Error(`Lokasi stok aktif untuk cabang ${String(branch.name || branch.code || branch.id)} tidak ditemukan.`)",
+              "if (!activeLocationId) console.warn(`Lokasi stok aktif untuk cabang ${String(branch.name || branch.code || branch.id)} belum dikonfigurasi.`)")
+          replace('features/dashboard/index.tsx',
+              "db.from('stock_balances').select('product_id,location_id,qty_base,reserved_qty').eq('location_id', activeLocationId).limit(1000),",
+              "activeLocationId ? db.from('stock_balances').select('product_id,location_id,qty_base,reserved_qty').eq('location_id', activeLocationId).limit(1000) : Promise.resolve({ data: [], error: null }),")
+
+          # Offline queue counts must remain usable while the browser is offline.
+          replace('app/sales-terminal.tsx',
+              "  const refreshPending = useCallback(async () => {\n    try {\n      const { business, branch } = await getActiveWorkspace()\n      setPendingCount((await getPendingOfflineSales({ businessId: business.id, branchId: branch.id })).length)\n    } catch {}\n  }, [])",
+              "  const refreshPending = useCallback(async () => {\n    try {\n      const activeBranchId = branchId || getStoredBranchId()\n      if (!activeBranchId) { setPendingCount(0); return }\n      setPendingCount((await getPendingOfflineSales({ branchId: activeBranchId })).length)\n    } catch {}\n  }, [branchId])")
+
+          # A scoped cache lookup must never fall back to an unrelated cache.
+          replace('lib/offline-pos.ts',
+              "export async function getCatalogCache(scope?: OfflineScope): Promise<CatalogCache | null> {\n  const db = await openDb()",
+              "export async function getCatalogCache(scope?: OfflineScope): Promise<CatalogCache | null> {\n  if (scope && !scope.businessId && !scope.branchId && !scope.locationId) return null\n  const db = await openDb()")
+          replace('lib/offline-pos.ts',
+              "if (scope?.businessId || scope?.branchId || scope?.locationId) {\n        const rows = Array.isArray(request.result) ? request.result : request.result ? [request.result] : []\n        const match = rows\n          .filter((row: any) => !scope.businessId || row.businessId === scope.businessId)",
+              "if (scope?.businessId || scope?.branchId || scope?.locationId) {\n        const rows = Array.isArray(request.result) ? request.result : request.result ? [request.result] : []\n        const match = rows\n          .filter((row: any) => Boolean(row.businessId))\n          .filter((row: any) => !scope.businessId || row.businessId === scope.businessId)")
+          print('workspace safety patch complete')
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add features/reports/index.tsx features/dashboard/index.tsx lib/offline-pos.ts app/sales-terminal.tsx
+          git commit -m "fix(workspace): preserve offline and empty-location states"
+          git push
+      - name: Remove temporary runner
+        run: |
+          git rm .github/workflows/_tmp_workspace_safety.yml
+          git commit -m "chore(ci): remove temporary workspace safety runner"
+          git push
