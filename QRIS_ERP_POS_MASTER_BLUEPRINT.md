@@ -1,6 +1,6 @@
 # QRIS ERP/POS Master Blueprint
 
-> Living specification untuk pengembangan QRIS ERP/POS. POSJOPAY menjadi referensi functional requirement dan workflow, bukan source code yang di-porting mentah.
+> Living specification untuk pengembangan QRIS ERP/POS. Legacy POS reference menjadi referensi functional requirement dan workflow, bukan source code yang di-porting mentah.
 
 ## 1. Prinsip Utama
 
@@ -16,15 +16,15 @@
 - Operator harus dapat membuat master yang diperlukan secara inline tanpa kehilangan draft transaksi.
 - UI harus menjelaskan konsekuensi aksi sensitif.
 
-## 2. Referensi POSJOPAY
+## 2. Referensi Legacy POS
 
-Audit source POSJOPAY menemukan modul/fungsi utama: POS/Kasir, Held Sales, Sales, Void, Purchases, Products, Product Units, Categories, Units, Suppliers, Customers, Stock, Stock Adjustment, Cash Sessions, Cash Movements, Expenses, Receivables, Customer Payments, Reports, Users/Roles, Audit Logs, Settings, Receipt/Print.
+Audit source legacy POS menemukan modul/fungsi utama: POS/Kasir, Held Sales, Sales, Void, Purchases, Products, Stock, Stock Adjustment, Cash Sessions, Cash Movements, Expenses, Receivables, Customer Payments, Reports, Users/Roles, Audit Logs, Settings, Receipt/Print.
 
-Tabel referensi utama yang ditemukan: roles, users, categories, units, products, product_units, suppliers, customers, cash_sessions, sales, sale_items, stock_movements, expenses, cash_movements, customer_payments, customer_receivables, held_sales, held_sale_items, audit_logs, settings, purchases, purchase_items.
+Referensi ini digunakan untuk menangkap functional requirement dan workflow operator. Implementasi QRIS tetap mengikuti arsitektur multi-tenant dan schema QRIS.
 
-## 3. Mapping POSJOPAY → QRIS
+## 3. Mapping Legacy POS → QRIS
 
-| POSJOPAY | QRIS | Arah |
+| Legacy POS | QRIS | Arah |
 |---|---|---|
 | POS/Kasir | Sales Terminal | Sudah ada, refinement |
 | Held Sales | Sales Terminal | P1 |
@@ -55,7 +55,7 @@ Tabel referensi utama yang ditemukan: roles, users, categories, units, products,
 
 ## 4. Arsitektur yang Dipertahankan
 
-POSJOPAY berorientasi single-store. QRIS harus tetap multi-tenant:
+Legacy POS berorientasi single-store. QRIS harus tetap multi-tenant:
 
 ```text
 business
@@ -74,7 +74,7 @@ roles
 permissions
 ```
 
-Jangan menyalin schema POSJOPAY 1:1.
+Jangan menyalin schema legacy 1:1.
 
 ## 5. Master Data
 
@@ -112,7 +112,7 @@ RECEIVABLE berarti kewajiban finansial, bukan offline.
 
 ## 7. Held Sales
 
-Referensi POSJOPAY memiliki `held_sales` dan `held_sale_items`.
+Referensi legacy POS memiliki konsep held sales.
 
 Target QRIS:
 
@@ -241,7 +241,7 @@ QRIS memiliki safe reset dengan dua mode.
 
 **Transactions:** sales, sale items, payments/events, receivables/payments, payables/payments, purchase orders, goods receipts, stock movements/balances, returns, adjustments, transfers, cashier shifts/cash movements dan data transaksi terkait.
 
-**Full:** transaction reset + master demo data seperti products, product units/prices, customers, categories, brands, price lists, payment methods, QRIS configurations, locations, units, dan audit logs.
+**Full:** transaction reset + master demo data seperti products, product units/prices, customers, categories, brands, price lists, payment methods, QRIS configurations, locations, units, suppliers, dan audit logs.
 
 Tetap pertahankan business, branch, account/login, membership, roles, permissions. Reset dibatasi user berotorisasi dan membutuhkan konfirmasi eksplisit.
 
@@ -413,7 +413,7 @@ Prioritas ketika terjadi konflik:
 2. Security/RLS.
 3. Business requirement.
 4. Existing QRIS schema.
-5. Functional requirement POSJOPAY.
+5. Functional requirement legacy POS.
 6. UI convention.
 7. Cosmetic preference.
 
