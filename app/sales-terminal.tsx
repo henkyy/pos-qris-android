@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { requireSupabase } from '../lib/supabase'
+import { getActiveWorkspace } from '../lib/business-context'
 import { enqueueOfflineSale, getCatalogCache, getPendingOfflineSales, removeOfflineSale, saveCatalogCache, type OfflineSale, type OfflinePaymentCode } from '../lib/offline-pos'
 import { normalizePaymentCode, type PaymentCode } from '../lib/payments'
 import styles from './sales.module.css'
@@ -102,41 +103,36 @@ export default function SalesTerminal() {
     try {
       if (!navigator.onLine) throw new Error('OFFLINE_MODE')
       const db = requireSupabase()
-      const { data: businesses, error: be } = await db.from('businesses').select('*').eq('code', 'TOKO_MAJU_JAYA').limit(1)
-      if (be) throw be
-      const business = businesses?.[0]
-      if (!business) throw new Error('Business TOKO_MAJU_JAYA tidak ditemukan.')
-      const [{ data: ps, error: pe }, { data: cs, error: ce }, { data: us, error: ue }, { data: bs, error: se }, { data: branches, error: bre }, { data: cus, error: cue }, { data: methods, error: me }] = await Promise.all([
+      const { business, branch } = await getActiveWorkspace()
+      const { data: locations, error: le } = await db.from('locations').select('*').eq('branch_id', branch.id).eq('is_active', true).order('name')
+      if (le) throw le
+      const locationIdNext = locations?.[0]?.id || ''
+      if (!locationIdNext) throw new Error(`Lokasi stok aktif untuk cabang ${text(branch.name || branch.code || branch.id)} tidak ditemukan.`)
+      const [{ data: ps, error: pe }, { data: cs, error: ce }, { data: us, error: ue }, { data: bs, error: se }, { data: cus, error: cue }, { data: methods, error: me }] = await Promise.all([
         db.from('products').select('*').eq('business_id', business.id).eq('is_active', true).order('name'),
         db.from('categories').select('*').eq('business_id', business.id).eq('is_active', true).order('name'),
         db.from('units').select('*').eq('business_id', business.id).order('name'),
-        db.from('stock_balances').select('*'),
-        db.from('branches').select('*').eq('business_id', business.id).eq('is_active', true).limit(1),
+        db.from('stock_balances').select('*').eq('location_id', locationIdNext),
         db.from('customers').select('*').eq('business_id', business.id).eq('is_active', true).order('name'),
         db.from('payment_methods').select('*').eq('business_id', business.id).eq('is_active', true).order('name'),
       ])
-      if (pe || ce || ue || se || bre || cue || me) throw pe || ce || ue || se || bre || cue || me
-      const branch = branches?.[0]
-      if (!branch) throw new Error('Cabang aktif tidak ditemukan.')
-      const { data: locations, error: le } = await db.from('locations').select('*').eq('branch_id', branch.id).eq('is_active', true).limit(1)
-      if (le) throw le
-      const locationIdNext = locations?.[0]?.id || ''
+      if (pe || ce || ue || se || cue || me) throw pe || ce || ue || se || cue || me
       const { data: pls, error: ple } = await db.from('price_lists').select('*').eq('business_id', business.id).eq('is_default', true).eq('is_active', true).limit(1)
       if (ple) throw ple
       const pl = pls?.[0]
       const { data: prs, error: pre } = pl ? await db.from('product_prices').select('*').eq('price_list_id', pl.id) : { data: [], error: null }
       if (pre) throw pre
       const usable = (methods || []).filter(m => ['CASH','RECEIVABLE','PIUTANG','AR','QRIS','TRANSFER','BANK_TRANSFER'].includes(text(m.code).toUpperCase()) || ['CASH','RECEIVABLE','PIUTANG','QRIS','TRANSFER','BANK_TRANSFER'].includes(text(m.method_type).toUpperCase()))
-      const cash = usable.find(m => normalizePaymentCode(text(m.code || m.method_type)) === 'CASH')
-      const defaultMethod = cash || usable[0]
+      const cashMethod = usable.find(m => normalizePaymentCode(text(m.code || m.method_type)) === 'CASH')
+      const defaultMethod = cashMethod || usable[0]
       setProducts(ps || []); setCategories(cs || []); setUnits(us || []); setStock(bs || []); setCustomers(cus || []); setPaymentMethods(usable); setBranchId(branch.id); setLocationId(locationIdNext); setPrices(prs || []); setPaymentMethodId(defaultMethod?.id || ''); setPaymentCode(normalizePaymentCode(text(defaultMethod?.code || defaultMethod?.method_type || 'CASH'))); setOnline(true)
-      await saveCatalogCache({ products: ps || [], categories: cs || [], units: us || [], prices: prs || [], stock: bs || [], branchId: branch.id, locationId: locationIdNext, cashMethodId: cash?.id || '', paymentMethods: usable, customers: cus || [] } as any)
+      await saveCatalogCache({ products: ps || [], categories: cs || [], units: us || [], prices: prs || [], stock: bs || [], branchId: branch.id, locationId: locationIdNext, cashMethodId: cashMethod?.id || '', paymentMethods: usable, customers: cus || [] } as any)
     } catch (e: any) {
       const cached = await getCatalogCache().catch(() => null)
       if (cached) {
         setProducts(cached.products || []); setCategories(cached.categories || []); setUnits(cached.units || []); setPrices(cached.prices || []); setStock(cached.stock || []); setCustomers((cached as any).customers || []); setPaymentMethods((cached as any).paymentMethods || []); setBranchId(cached.branchId || ''); setLocationId(cached.locationId || '')
-        const cash = ((cached as any).paymentMethods || []).find((m: Row) => normalizePaymentCode(text(m.code || m.method_type)) === 'CASH')
-        setPaymentMethodId(cash?.id || cached.cashMethodId || ''); setPaymentCode('CASH'); setOnline(false)
+        const cashMethod = ((cached as any).paymentMethods || []).find((m: Row) => normalizePaymentCode(text(m.code || m.method_type)) === 'CASH')
+        setPaymentMethodId(cashMethod?.id || cached.cashMethodId || ''); setPaymentCode('CASH'); setOnline(false)
         if (e?.message !== 'OFFLINE_MODE') toast('info', 'Mode offline', 'Server tidak dapat dihubungi. Katalog, stok, pelanggan, dan metode tersimpan lokal tetap digunakan.')
       } else toast('error', 'Gagal memuat data', e.message || 'Periksa koneksi Supabase.')
     } finally { if (!silent) setLoading(false) }
