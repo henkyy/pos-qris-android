@@ -33,11 +33,15 @@ export type EntityConfig = {
   usageNote?: string
 }
 
+type Option = { id: string; name: string }
+type InlineField = { key: string; label: string; type?: 'text' | 'number'; required?: boolean; placeholder?: string }
+
 const currencyKeys = new Set(['credit_limit', 'total_amount', 'amount', 'original_amount', 'paid_amount', 'outstanding_amount'])
 const foreignLabels: Record<string, string> = {
   product_id: 'products', location_id: 'locations', customer_id: 'customers', supplier_id: 'suppliers',
   category_id: 'categories', payment_method_id: 'payment_methods', unit_id: 'units'
 }
+const inlineSources = new Set(['customers', 'suppliers', 'categories', 'units'])
 
 function formatNumber(value: unknown) {
   const n = Number(value)
@@ -65,17 +69,47 @@ function cellTone(key: string, value: unknown) {
   }
   return ''
 }
+function makeCode(name: string) {
+  const code = name.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '').slice(0, 12)
+  return code || 'DATA'
+}
+function inlineFields(source: string): InlineField[] {
+  if (source === 'customers') return [
+    { key: 'name', label: 'Nama pelanggan', required: true, placeholder: 'Contoh: Budi' },
+    { key: 'code', label: 'Kode pelanggan', required: true, placeholder: 'Contoh: BUDI-01' },
+    { key: 'phone', label: 'Telepon', placeholder: 'Opsional' },
+  ]
+  if (source === 'suppliers') return [
+    { key: 'name', label: 'Nama supplier', required: true, placeholder: 'Contoh: PT Sumber Jaya' },
+    { key: 'code', label: 'Kode supplier', required: true, placeholder: 'Contoh: SUP-01' },
+    { key: 'phone', label: 'Telepon', placeholder: 'Opsional' },
+  ]
+  if (source === 'categories') return [
+    { key: 'name', label: 'Nama kategori', required: true, placeholder: 'Contoh: Minuman' },
+    { key: 'code', label: 'Kode kategori', required: true, placeholder: 'Contoh: MINUM' },
+  ]
+  return [
+    { key: 'name', label: 'Nama satuan', required: true, placeholder: 'Contoh: Kilogram' },
+    { key: 'code', label: 'Kode satuan', required: true, placeholder: 'Contoh: KG' },
+    { key: 'symbol', label: 'Simbol', placeholder: 'Contoh: kg' },
+    { key: 'decimal_places', label: 'Jumlah desimal', type: 'number', placeholder: '0' },
+  ]
+}
 
 export default function EntityPage({ config }: { config: EntityConfig }) {
   const [rows, setRows] = useState<Record<string, unknown>[]>([])
   const [labels, setLabels] = useState<Record<string, Record<string, string>>>({})
-  const [options, setOptions] = useState<Record<string, { id: string; name: string }[]>>({})
+  const [options, setOptions] = useState<Record<string, Option[]>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Record<string, unknown> | null>(null)
   const [form, setForm] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
+  const [inlineSource, setInlineSource] = useState('')
+  const [inlineForm, setInlineForm] = useState<Record<string, string>>({})
+  const [inlineSaving, setInlineSaving] = useState(false)
   const [search, setSearch] = useState('')
   const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'inactive'>('all')
 
@@ -99,12 +133,14 @@ export default function EntityPage({ config }: { config: EntityConfig }) {
       }))
 
       const sources = [...new Set((config.fields || []).map(field => field.source).filter(Boolean))] as string[]
-      const nextOptions: Record<string, { id: string; name: string }[]> = {}
+      const nextOptions: Record<string, Option[]> = {}
       await Promise.all(sources.map(async source => {
         let optionQuery = db.from(source).select('id,name').limit(500)
+        if (source !== 'units') optionQuery = optionQuery.eq('is_active', true)
         if (workspace) optionQuery = optionQuery.eq('business_id', workspace.business.id)
-        const { data: lookup } = await optionQuery
-        nextOptions[source] = (lookup || []) as { id: string; name: string }[]
+        const { data: lookup, error: lookupError } = await optionQuery
+        if (lookupError) throw lookupError
+        nextOptions[source] = (lookup || []) as Option[]
       }))
 
       setRows(nextRows)
@@ -150,6 +186,59 @@ export default function EntityPage({ config }: { config: EntityConfig }) {
     setForm(Object.fromEntries((config.fields || []).map(f => [f.key, String(original[f.key] ?? '')])))
     setError('')
     setOpen(true)
+  }
+  function startInline(source: string) {
+    setInlineSource(source)
+    setInlineForm({ code: '' })
+    setError('')
+  }
+  function closeInline() {
+    if (!inlineSaving) {
+      setInlineSource('')
+      setInlineForm({})
+    }
+  }
+  function updateInline(key: string, value: string) {
+    setInlineForm(prev => {
+      const next = { ...prev, [key]: value }
+      if (key === 'name' && !prev.code) next.code = makeCode(value)
+      return next
+    })
+  }
+
+  async function createInline() {
+    const fields = inlineFields(inlineSource)
+    for (const field of fields) {
+      if (field.required && !inlineForm[field.key]?.trim()) {
+        setError(`${field.label} wajib diisi.`)
+        return
+      }
+      if (field.type === 'number' && inlineForm[field.key] && Number.isNaN(Number(inlineForm[field.key]))) {
+        setError(`${field.label} harus berupa angka.`)
+        return
+      }
+    }
+    setInlineSaving(true)
+    setError('')
+    try {
+      const db = requireSupabase()
+      const workspace = await getActiveWorkspace()
+      const payload: Record<string, unknown> = { business_id: workspace.business.id, is_active: true }
+      for (const field of fields) {
+        if (field.type === 'number') payload[field.key] = Number(inlineForm[field.key] || 0)
+        else payload[field.key] = inlineForm[field.key]?.trim() || null
+      }
+      const { data, error: insertError } = await db.from(inlineSource).insert(payload).select('id,name').single()
+      if (insertError) throw insertError
+      const option = data as Option
+      setOptions(prev => ({ ...prev, [inlineSource]: [option, ...(prev[inlineSource] || [])] }))
+      setForm(prev => ({ ...prev, [config.fields?.find(field => field.source === inlineSource)?.key || '']: option.id }))
+      closeInline()
+    } catch (e: any) {
+      setError(e?.message || `Gagal membuat ${inlineSource}.`)
+    } finally {
+      setInlineSaving(false)
+    }
   }
 
   async function save() {
@@ -206,6 +295,9 @@ export default function EntityPage({ config }: { config: EntityConfig }) {
     }
   }
 
+  const currentInlineFields = inlineSource ? inlineFields(inlineSource) : []
+  const currentInlineLabel = inlineSource === 'customers' ? 'pelanggan' : inlineSource === 'suppliers' ? 'supplier' : inlineSource === 'categories' ? 'kategori' : 'satuan'
+
   return <div className="module-page">
     <div className={styles.heroRow}>
       <div className={styles.heroCopy}><span className="eyebrow">{config.eyebrow}</span><h1>{config.title}</h1><p>{config.description}</p></div>
@@ -241,9 +333,17 @@ export default function EntityPage({ config }: { config: EntityConfig }) {
     {config.fields?.length ? <Modal open={open} title={editing ? `Edit ${config.title}` : `Tambah ${config.title}`} onClose={() => setOpen(false)}>
       <div className={styles.formIntro}><strong>{editing ? 'Perbarui data dengan hati-hati.' : `Tambah ${config.title.toLowerCase()} baru.`}</strong><span>Data master yang sudah dipakai transaksi tidak dihapus dari histori. Gunakan Nonaktifkan jika tidak ingin dipakai lagi.</span></div>
       <div className="module-form">
-        {config.fields.map(field => field.type === 'select' ? <label key={field.key} className="ui-field"><span>{field.label}{field.required ? ' *' : ''}</span><select value={form[field.key] || ''} onChange={e => setForm(prev => ({ ...prev, [field.key]: e.target.value }))}><option value="">Pilih {field.label.toLowerCase()}</option>{(options[field.source || ''] || []).map(option => <option key={option.id} value={option.id}>{option.name}</option>)}</select>{field.help ? <small>{field.help}</small> : null}</label> : <div key={field.key}><Input label={`${field.label}${field.required ? ' *' : ''}`} type={field.type === 'number' ? 'number' : 'text'} value={form[field.key] || ''} placeholder={field.placeholder} onChange={e => setForm(prev => ({ ...prev, [field.key]: e.target.value }))} />{field.help ? <small className={styles.fieldHelp}>{field.help}</small> : null}</div>)}
-        <div className={styles.formActions}><Button variant="secondary" onClick={() => setOpen(false)} disabled={saving}>Batal</Button><Button onClick={save} disabled={saving}>{saving ? 'Menyimpan…' : editing ? 'Simpan perubahan' : 'Simpan data'}</Button></div>
+        {config.fields.map(field => field.type === 'select' ? <div key={field.key} className={styles.selectWithAction}><label className="ui-field"><span>{field.label}{field.required ? ' *' : ''}</span><select value={form[field.key] || ''} onChange={e => setForm(prev => ({ ...prev, [field.key]: e.target.value }))}><option value="">Pilih {field.label.toLowerCase()}</option>{(options[field.source || ''] || []).map(option => <option key={option.id} value={option.id}>{option.name}</option>)}</select>{field.help ? <small>{field.help}</small> : null}</label>{field.source && inlineSources.has(field.source) ? <button type="button" className={styles.inlineLink} onClick={() => startInline(field.source!)}>+ Buat baru</button> : null}</div> : <div key={field.key}><Input label={`${field.label}${field.required ? ' *' : ''}`} type={field.type === 'number' ? 'number' : 'text'} value={form[field.key] || ''} placeholder={field.placeholder} onChange={e => setForm(prev => ({ ...prev, [field.key]: e.target.value }))} />{field.help ? <small className={styles.fieldHelp}>{field.help}</small> : null}</div>)}
+        <div className={styles.formActions}><Button variant="secondary" onClick={() => setOpen(false)} disabled={saving || inlineSaving}>Batal</Button><Button onClick={save} disabled={saving || inlineSaving}>{saving ? 'Menyimpan…' : editing ? 'Simpan perubahan' : 'Simpan data'}</Button></div>
       </div>
+
+      {inlineSource ? <div className={styles.inlinePanel}>
+        <div className={styles.inlineHeader}><div><strong>Buat {currentInlineLabel} tanpa meninggalkan form</strong><span>Data baru akan langsung dipilih pada field {currentInlineLabel}.</span></div><button type="button" className={styles.inlineClose} onClick={closeInline} disabled={inlineSaving}>Tutup</button></div>
+        <div className={styles.inlineGrid}>
+          {currentInlineFields.map(field => <Input key={field.key} label={`${field.label}${field.required ? ' *' : ''}`} type={field.type === 'number' ? 'number' : 'text'} value={inlineForm[field.key] || ''} placeholder={field.placeholder} onChange={e => updateInline(field.key, e.target.value)} />)}
+        </div>
+        <div className={styles.inlineActions}><Button variant="secondary" onClick={closeInline} disabled={inlineSaving}>Batal</Button><Button onClick={createInline} disabled={inlineSaving}>{inlineSaving ? 'Membuat…' : `Buat ${currentInlineLabel}`}</Button></div>
+      </div> : null}
     </Modal> : null}
   </div>
 }
