@@ -47,7 +47,7 @@ export default function ReportsPage() {
         const { data: locations, error: locationError } = await db.from('locations').select('id,name,code').eq('branch_id', branch.id).eq('is_active', true).order('name').limit(1)
         if (locationError) throw locationError
         const activeLocationId = locations?.[0]?.id
-        if (!activeLocationId) throw new Error(`Lokasi stok aktif untuk cabang ${String(branch.name || branch.code || branch.id)} tidak ditemukan.`)
+        if (!activeLocationId) console.warn(`Lokasi stok aktif untuk cabang ${String(branch.name || branch.code || branch.id)} belum dikonfigurasi.`)
         const since = new Date() since.setHours(0, 0, 0, 0); since.setDate(since.getDate() - (period - 1))
         const [sales, products, purchases, receipts, receivables, payments, methods, stock] = await Promise.all([
           db.from('sales').select('id,sale_no,sale_date,total_amount,hpp_amount,margin_amount,status').eq('business_id', business.id).eq('branch_id', branch.id).gte('sale_date', since.toISOString()).order('sale_date', { ascending: true }).limit(2000),
@@ -57,7 +57,7 @@ export default function ReportsPage() {
           db.from('receivables').select('invoice_no,outstanding_amount,original_amount,paid_amount,due_date,status').eq('business_id', business.id).eq('branch_id', branch.id).gt('outstanding_amount', 0).limit(1000),
           db.from('payments').select('amount,status,payment_method_id,paid_at').eq('business_id', business.id).eq('branch_id', branch.id).gte('created_at', since.toISOString()).limit(2000),
           db.from('payment_methods').select('id,name,code').eq('business_id', business.id).eq('is_active', true),
-          db.from('stock_balances').select('product_id,location_id,qty_base,reserved_qty').eq('location_id', activeLocationId).limit(3000),
+          activeLocationId ? db.from('stock_balances').select('product_id,location_id,qty_base,reserved_qty').eq('location_id', activeLocationId).limit(3000) : Promise.resolve({ data: [], error: null }),
         ])
         const ids = (sales.data || []).map(x => x.id)
         let itemsData: SaleItem[] = []

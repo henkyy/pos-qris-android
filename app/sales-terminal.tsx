@@ -97,10 +97,11 @@ export default function SalesTerminal() {
 
   const refreshPending = useCallback(async () => {
     try {
-      const { business, branch } = await getActiveWorkspace()
-      setPendingCount((await getPendingOfflineSales({ businessId: business.id, branchId: branch.id })).length)
+      const activeBranchId = branchId || getStoredBranchId()
+      if (!activeBranchId) { setPendingCount(0); return }
+      setPendingCount((await getPendingOfflineSales({ branchId: activeBranchId })).length)
     } catch {}
-  }, [])
+  }, [branchId])
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)

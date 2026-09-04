@@ -85,6 +85,7 @@ export async function saveCatalogCache(cache: Omit<CatalogCache, 'cachedAt'>) {
 }
 
 export async function getCatalogCache(scope?: OfflineScope): Promise<CatalogCache | null> {
+  if (scope && !scope.businessId && !scope.branchId && !scope.locationId) return null
   const db = await openDb()
   return new Promise((resolve, reject) => {
     const store = db.transaction(CATALOG_STORE, 'readonly').objectStore(CATALOG_STORE)
@@ -96,6 +97,7 @@ export async function getCatalogCache(scope?: OfflineScope): Promise<CatalogCach
       if (scope?.businessId || scope?.branchId || scope?.locationId) {
         const rows = Array.isArray(request.result) ? request.result : request.result ? [request.result] : []
         const match = rows
+          .filter((row: any) => Boolean(row.businessId))
           .filter((row: any) => !scope.businessId || row.businessId === scope.businessId)
           .filter((row: any) => !scope.branchId || row.branchId === scope.branchId)
           .filter((row: any) => !scope.locationId || row.locationId === scope.locationId)
