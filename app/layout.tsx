@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Manrope } from 'next/font/google'
 import './globals.css'
+import '../features/shared/entity-page-polish.css'
 
 const manrope = Manrope({ subsets: ['latin'], display: 'swap' })
 
