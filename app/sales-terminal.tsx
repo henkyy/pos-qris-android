@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { requireSupabase } from '../lib/supabase'
-import { getActiveWorkspace } from '../lib/business-context'
+import { getActiveWorkspace, getStoredBranchId } from '../lib/business-context'
 import { enqueueOfflineSale, getCatalogCache, getPendingOfflineSales, removeOfflineSale, saveCatalogCache, type OfflineSale, type OfflinePaymentCode } from '../lib/offline-pos'
 import { normalizePaymentCode, type PaymentCode } from '../lib/payments'
 import styles from './sales.module.css'
@@ -32,6 +32,7 @@ export default function SalesTerminal() {
   const [stock, setStock] = useState<Row[]>([])
   const [customers, setCustomers] = useState<Row[]>([])
   const [paymentMethods, setPaymentMethods] = useState<Row[]>([])
+  const [businessId, setBusinessId] = useState('')
   const [branchId, setBranchId] = useState('')
   const [locationId, setLocationId] = useState('')
   const [paymentMethodId, setPaymentMethodId] = useState('')
@@ -95,7 +96,10 @@ export default function SalesTerminal() {
   }, [products, search, categoryFilter, categoryName])
 
   const refreshPending = useCallback(async () => {
-    try { setPendingCount((await getPendingOfflineSales()).length) } catch {}
+    try {
+      const { business, branch } = await getActiveWorkspace()
+      setPendingCount((await getPendingOfflineSales({ businessId: business.id, branchId: branch.id })).length)
+    } catch {}
   }, [])
 
   const load = useCallback(async (silent = false) => {
@@ -125,12 +129,12 @@ export default function SalesTerminal() {
       const usable = (methods || []).filter(m => ['CASH','RECEIVABLE','PIUTANG','AR','QRIS','TRANSFER','BANK_TRANSFER'].includes(text(m.code).toUpperCase()) || ['CASH','RECEIVABLE','PIUTANG','QRIS','TRANSFER','BANK_TRANSFER'].includes(text(m.method_type).toUpperCase()))
       const cashMethod = usable.find(m => normalizePaymentCode(text(m.code || m.method_type)) === 'CASH')
       const defaultMethod = cashMethod || usable[0]
-      setProducts(ps || []); setCategories(cs || []); setUnits(us || []); setStock(bs || []); setCustomers(cus || []); setPaymentMethods(usable); setBranchId(branch.id); setLocationId(locationIdNext); setPrices(prs || []); setPaymentMethodId(defaultMethod?.id || ''); setPaymentCode(normalizePaymentCode(text(defaultMethod?.code || defaultMethod?.method_type || 'CASH'))); setOnline(true)
-      await saveCatalogCache({ products: ps || [], categories: cs || [], units: us || [], prices: prs || [], stock: bs || [], branchId: branch.id, locationId: locationIdNext, cashMethodId: cashMethod?.id || '', paymentMethods: usable, customers: cus || [] } as any)
+      setProducts(ps || []); setCategories(cs || []); setUnits(us || []); setStock(bs || []); setCustomers(cus || []); setPaymentMethods(usable); setBusinessId(business.id); setBranchId(branch.id); setLocationId(locationIdNext); setPrices(prs || []); setPaymentMethodId(defaultMethod?.id || ''); setPaymentCode(normalizePaymentCode(text(defaultMethod?.code || defaultMethod?.method_type || 'CASH'))); setOnline(true)
+      await saveCatalogCache({ products: ps || [], categories: cs || [], units: us || [], prices: prs || [], stock: bs || [], businessId: business.id, branchId: branch.id, locationId: locationIdNext, cashMethodId: cashMethod?.id || '', paymentMethods: usable, customers: cus || [] } as any)
     } catch (e: any) {
-      const cached = await getCatalogCache().catch(() => null)
+      const cached = await getCatalogCache({ branchId: getStoredBranchId() || undefined }).catch(() => null)
       if (cached) {
-        setProducts(cached.products || []); setCategories(cached.categories || []); setUnits(cached.units || []); setPrices(cached.prices || []); setStock(cached.stock || []); setCustomers((cached as any).customers || []); setPaymentMethods((cached as any).paymentMethods || []); setBranchId(cached.branchId || ''); setLocationId(cached.locationId || '')
+        setProducts(cached.products || []); setCategories(cached.categories || []); setUnits(cached.units || []); setPrices(cached.prices || []); setStock(cached.stock || []); setCustomers((cached as any).customers || []); setPaymentMethods((cached as any).paymentMethods || []); setBusinessId(cached.businessId || ''); setBranchId(cached.branchId || ''); setLocationId(cached.locationId || '')
         const cashMethod = ((cached as any).paymentMethods || []).find((m: Row) => normalizePaymentCode(text(m.code || m.method_type)) === 'CASH')
         setPaymentMethodId(cashMethod?.id || cached.cashMethodId || ''); setPaymentCode('CASH'); setOnline(false)
         if (e?.message !== 'OFFLINE_MODE') toast('info', 'Mode offline', 'Server tidak dapat dihubungi. Katalog, stok, pelanggan, dan metode tersimpan lokal tetap digunakan.')
@@ -188,7 +192,7 @@ export default function SalesTerminal() {
   function holdOrder() { if (!cart.length) return; const order: HeldOrder = { id: crypto.randomUUID(), name: `Pesanan ${heldOrders.length + 1}`, items: cart, note, createdAt: new Date().toISOString() }; const next = [order, ...heldOrders]; setHeldOrders(next); window.localStorage.setItem('qris-held-orders', JSON.stringify(next)); clearCart(); toast('success', 'Pesanan ditahan', 'Pesanan bisa dilanjutkan dari daftar pesanan ditahan.') }
   function resumeOrder(order: HeldOrder) { setCart(order.items); setNote(order.note); const next = heldOrders.filter(x => x.id !== order.id); setHeldOrders(next); setShowHeld(false); window.localStorage.setItem('qris-held-orders', JSON.stringify(next)); toast('info', 'Pesanan dilanjutkan', `${order.name} kembali ke kasir.`) }
 
-  function localSaleFromCart(idempotencyKey?: string): OfflineSale { return { id: crypto.randomUUID(), branchId, locationId, customerId: customerId || null, items: cart.map(({ product, qty }) => ({ product, qty, unit_price: priceFor(product, qty) })), paymentMethodId, paymentCode: selectedCode as OfflinePaymentCode, total: Math.round(total), cashReceived: needsCash ? received : 0, reference: needsReference ? reference.trim() : '', provider, discountAmount: Math.round(discountValue), note, idempotencyKey: idempotencyKey || crypto.randomUUID(), createdAt: new Date().toISOString() } }
+  function localSaleFromCart(idempotencyKey?: string): OfflineSale { return { id: crypto.randomUUID(), businessId, branchId, locationId, customerId: customerId || null, items: cart.map(({ product, qty }) => ({ product, qty, unit_price: priceFor(product, qty) })), paymentMethodId, paymentCode: selectedCode as OfflinePaymentCode, total: Math.round(total), cashReceived: needsCash ? received : 0, reference: needsReference ? reference.trim() : '', provider, discountAmount: Math.round(discountValue), note, idempotencyKey: idempotencyKey || crypto.randomUUID(), createdAt: new Date().toISOString() } }
 
   function validateCheckout() {
     if (!branchId || !locationId || !paymentMethodId || !cart.length) return 'Data checkout belum lengkap.'
