@@ -7,6 +7,64 @@ export type ActiveWorkspace = {
   branch: Record<string, any>
 }
 
+const BRANCH_STORAGE_KEY = 'qris-active-branch-id'
+
+export function getStoredBranchId(): string | null {
+  try {
+    return localStorage.getItem(BRANCH_STORAGE_KEY)
+  } catch {
+    return null
+  }
+}
+
+export function setStoredBranchId(branchId: string) {
+  try {
+    localStorage.setItem(BRANCH_STORAGE_KEY, branchId)
+  } catch {}
+}
+
+export function clearStoredBranchId() {
+  try {
+    localStorage.removeItem(BRANCH_STORAGE_KEY)
+  } catch {}
+}
+
+export async function getAccessibleBranches(businessId?: string): Promise<Record<string, any>[]> {
+  const db = requireSupabase()
+  let business = businessId
+
+  if (!business) {
+    const { data: memberships, error } = await db
+      .from('business_users')
+      .select('business_id')
+      .eq('is_active', true)
+      .limit(1)
+    if (error) throw error
+    business = memberships?.[0]?.business_id
+  }
+
+  if (!business) return []
+
+  const { data: accesses, error: accessError } = await db
+    .from('user_branch_access')
+    .select('branch_id')
+  if (accessError) throw accessError
+
+  const branchIds = (accesses || []).map((x: any) => x.branch_id).filter(Boolean)
+  if (!branchIds.length) return []
+
+  const { data: branches, error: branchError } = await db
+    .from('branches')
+    .select('*')
+    .eq('business_id', business)
+    .eq('is_active', true)
+    .in('id', branchIds)
+    .order('name')
+
+  if (branchError) throw branchError
+  return branches || []
+}
+
 export async function getActiveWorkspace(): Promise<ActiveWorkspace> {
   const db = requireSupabase()
 
@@ -33,26 +91,15 @@ export async function getActiveWorkspace(): Promise<ActiveWorkspace> {
   if (businessError) throw businessError
   if (!business) throw new Error('Business aktif tidak ditemukan atau sudah tidak aktif.')
 
-  const { data: accesses, error: accessError } = await db
-    .from('user_branch_access')
-    .select('branch_id')
-    .limit(1)
+  const branches = await getAccessibleBranches(business.id)
+  if (!branches.length) {
+    throw new Error('Cabang aktif tidak ditemukan. Akun belum memiliki akses cabang.')
+  }
 
-  if (accessError) throw accessError
+  const storedBranchId = getStoredBranchId()
+  const branch = branches.find((x: any) => x.id === storedBranchId) || branches[0]
 
-  const branchId = accesses?.[0]?.branch_id
-  if (!branchId) throw new Error('Cabang aktif tidak ditemukan. Akun belum memiliki akses cabang.')
-
-  const { data: branch, error: branchError } = await db
-    .from('branches')
-    .select('*')
-    .eq('id', branchId)
-    .eq('business_id', business.id)
-    .eq('is_active', true)
-    .single()
-
-  if (branchError) throw branchError
-  if (!branch) throw new Error('Cabang aktif tidak ditemukan atau sudah tidak aktif.')
+  if (branch.id !== storedBranchId) setStoredBranchId(branch.id)
 
   return { business, branch }
 }
