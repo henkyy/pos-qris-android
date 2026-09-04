@@ -1,7 +1,7 @@
 'use client'
 
-import ProductWorkspace from './ProductWorkspace'
+import ProductCatalog from './ProductCatalog'
 
 export default function ProductsPage() {
-  return <ProductWorkspace />
+  return <ProductCatalog />
 }
