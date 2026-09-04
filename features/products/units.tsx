@@ -1,3 +1,3 @@
-import EntityPage from '../shared/EntityPage'
-import { entityConfigs } from '../shared/config'
-export default function ProductUnitsPage() { return <EntityPage config={entityConfigs.units} /> }
+'use client'
+import MasterDataWorkspace from './MasterDataWorkspace'
+export default function ProductUnitsPage(){return <MasterDataWorkspace mode="units"/>}
