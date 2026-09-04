@@ -15,6 +15,8 @@ type Field = {
   required?: boolean
   type?: 'text' | 'number' | 'select'
   source?: string
+  placeholder?: string
+  help?: string
 }
 export type EntityConfig = {
   title: string
@@ -27,6 +29,8 @@ export type EntityConfig = {
   businessScoped?: boolean
   readOnly?: boolean
   softDelete?: boolean
+  workflow?: string[]
+  usageNote?: string
 }
 
 const currencyKeys = new Set(['credit_limit', 'total_amount', 'amount', 'original_amount', 'paid_amount', 'outstanding_amount'])
@@ -42,7 +46,8 @@ function formatNumber(value: unknown) {
 function formatCell(key: string, value: unknown) {
   if (value === null || value === undefined || value === '') return '-'
   if (key === 'is_active') return value ? 'Aktif' : 'Nonaktif'
-  if (currencyKeys.has(key) || key === 'qty_base') return formatNumber(value)
+  if (currencyKeys.has(key)) return `Rp ${formatNumber(value)}`
+  if (key === 'qty_base') return formatNumber(value)
   if (key === 'status') return String(value).replace(/_/g, ' ')
   if (key.endsWith('_at') || key.endsWith('_date')) {
     const date = new Date(String(value))
@@ -72,6 +77,7 @@ export default function EntityPage({ config }: { config: EntityConfig }) {
   const [form, setForm] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
+  const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'inactive'>('all')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -121,10 +127,15 @@ export default function EntityPage({ config }: { config: EntityConfig }) {
 
   const filteredRows = useMemo(() => {
     const needle = search.trim().toLowerCase()
-    return needle ? displayRows.filter(row => config.columns.some(key => String(row[key] ?? '').toLowerCase().includes(needle))) : displayRows
-  }, [displayRows, search, config.columns])
+    return displayRows.filter(row => {
+      const matchesSearch = !needle || config.columns.some(key => String(row[key] ?? '').toLowerCase().includes(needle))
+      const matchesActive = activeFilter === 'all' || (activeFilter === 'active' ? row.is_active !== false : row.is_active === false)
+      return matchesSearch && matchesActive
+    })
+  }, [displayRows, search, activeFilter, config.columns])
 
   const activeCount = rows.filter(row => row.is_active !== false).length
+  const inactiveCount = rows.filter(row => row.is_active === false).length
   const attentionCount = rows.filter(row => ['overdue', 'pending', 'partial', 'draft'].includes(String(row.status).toLowerCase())).length
 
   function startCreate() {
@@ -146,6 +157,10 @@ export default function EntityPage({ config }: { config: EntityConfig }) {
     for (const field of config.fields) {
       if (field.required && !form[field.key]?.trim()) {
         setError(`${field.label} wajib diisi.`)
+        return
+      }
+      if (field.type === 'number' && form[field.key] && Number.isNaN(Number(form[field.key]))) {
+        setError(`${field.label} harus berupa angka.`)
         return
       }
     }
@@ -179,7 +194,7 @@ export default function EntityPage({ config }: { config: EntityConfig }) {
     if (!row.id || !config.softDelete) return
     const currentlyActive = row.is_active !== false
     const action = currentlyActive ? 'menonaktifkan' : 'mengaktifkan'
-    if (!window.confirm(`Yakin ingin ${action} ${String(row.name || row.sku || 'data')}?`)) return
+    if (!window.confirm(`Yakin ingin ${action} ${String(row.name || row.sku || 'data')}? Data transaksi historis tetap aman.`)) return
     setError('')
     try {
       const db = requireSupabase()
@@ -192,23 +207,43 @@ export default function EntityPage({ config }: { config: EntityConfig }) {
   }
 
   return <div className="module-page">
-    <div className="module-hero">
-      <div><span className="eyebrow">{config.eyebrow}</span><h1>{config.title}</h1><p>{config.description}</p></div>
+    <div className={styles.heroRow}>
+      <div className={styles.heroCopy}><span className="eyebrow">{config.eyebrow}</span><h1>{config.title}</h1><p>{config.description}</p></div>
       {!config.readOnly && config.fields?.length ? <Button onClick={startCreate}>+ Tambah {config.title}</Button> : null}
     </div>
+
+    {config.workflow?.length ? <div className={styles.workflow}>
+      {config.workflow.map((step, index) => <div className={styles.workflowStep} key={step}><span>{index + 1}</span><strong>{step}</strong>{index < config.workflow!.length - 1 ? <i>›</i> : null}</div>)}
+    </div> : null}
+
+    {config.usageNote ? <div className={styles.usageNote}><strong>Catatan proses:</strong> {config.usageNote}</div> : null}
     {error && <div className="module-alert">{error}</div>}
+
     <div className={styles.metrics}>
-      <div className={styles.metric}><span>Total data</span><strong>{loading ? '…' : rows.length}</strong><small>Record tersedia</small></div>
+      <div className={styles.metric}><span>Total data</span><strong>{loading ? '…' : rows.length}</strong><small>Record dalam workspace aktif</small></div>
       <div className={styles.metric}><span>Aktif</span><strong>{loading ? '…' : activeCount}</strong><small>Siap digunakan</small></div>
-      <div className={styles.metric}><span>Perlu perhatian</span><strong>{loading ? '…' : attentionCount}</strong><small>Status perlu ditindaklanjuti</small></div>
+      {config.softDelete ? <div className={styles.metric}><span>Nonaktif</span><strong>{loading ? '…' : inactiveCount}</strong><small>Tidak dipakai transaksi baru</small></div> : <div className={styles.metric}><span>Perlu perhatian</span><strong>{loading ? '…' : attentionCount}</strong><small>Status perlu ditindaklanjuti</small></div>}
     </div>
+
     <section className="module-card">
       <div className={styles.toolbar}>
         <div><strong>Daftar {config.title}</strong><span>{loading ? 'Memuat data…' : `${filteredRows.length} dari ${rows.length} data`}</span></div>
-        <div className={styles.actions}><label className={styles.search}><span>⌕</span><input value={search} onChange={e => setSearch(e.target.value)} placeholder={`Cari ${config.title.toLowerCase()}…`} /></label><Button variant="secondary" onClick={load} disabled={loading}>Muat ulang</Button></div>
+        <div className={styles.actions}>
+          <label className={styles.search}><span>⌕</span><input value={search} onChange={e => setSearch(e.target.value)} placeholder={`Cari ${config.title.toLowerCase()}…`} /></label>
+          {config.softDelete ? <select className={styles.filter} value={activeFilter} onChange={e => setActiveFilter(e.target.value as typeof activeFilter)}><option value="all">Semua status</option><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select> : null}
+          <Button variant="secondary" onClick={load} disabled={loading}>Muat ulang</Button>
+        </div>
       </div>
-      {loading ? <EmptyState title="Memuat data" text="Mengambil data dari Supabase." /> : filteredRows.length ? <div className="ui-table-wrap"><table className="ui-table"><thead><tr>{config.columns.map(c => <th key={c}>{config.columnLabels?.[c] || c.replace(/_/g, ' ')}</th>)}{!config.readOnly && config.fields?.length ? <th>Aksi</th> : null}</tr></thead><tbody>{filteredRows.map((row, i) => <tr key={String(row.id ?? i)}>{config.columns.map(c => <td key={c}><span className={cellTone(c, row[c])}>{formatCell(c, row[c])}</span></td>)}{!config.readOnly && config.fields?.length ? <td><div className="table-actions"><button className="table-edit" onClick={() => startEdit(row)}>Edit</button>{config.softDelete ? <button className="table-edit" onClick={() => toggleActive(rows.find(item => item.id === row.id) || row)}>{row.is_active === false ? 'Aktifkan' : 'Nonaktifkan'}</button> : null}</div></td> : null}</tr>)}</tbody></table></div> : <EmptyState title={search ? 'Data tidak ditemukan' : 'Belum ada data'} text={search ? 'Coba kata kunci lain.' : 'Belum ada record yang tersedia untuk modul ini.'} />}
+
+      {loading ? <EmptyState title="Memuat data" text="Mengambil data dari workspace aktif." /> : filteredRows.length ? <div className="ui-table-wrap"><table className="ui-table"><thead><tr>{config.columns.map(c => <th key={c}>{config.columnLabels?.[c] || c.replace(/_/g, ' ')}</th>)}{!config.readOnly && config.fields?.length ? <th>Aksi</th> : null}</tr></thead><tbody>{filteredRows.map((row, i) => <tr key={String(row.id ?? i)}>{config.columns.map(c => <td key={c}><span className={cellTone(c, row[c])}>{formatCell(c, row[c])}</span></td>)}{!config.readOnly && config.fields?.length ? <td><div className="table-actions"><button className="table-edit" onClick={() => startEdit(row)}>Edit</button>{config.softDelete ? <button className="table-edit" onClick={() => toggleActive(rows.find(item => item.id === row.id) || row)}>{row.is_active === false ? 'Aktifkan' : 'Nonaktifkan'}</button> : null}</div></td> : null}</tr>)}</tbody></table></div> : <EmptyState title={search ? 'Data tidak ditemukan' : 'Belum ada data'} text={search ? 'Coba kata kunci atau filter status lain.' : 'Belum ada record yang tersedia untuk modul ini.'} />}
     </section>
-    {config.fields?.length ? <Modal open={open} title={editing ? `Edit ${config.title}` : `Tambah ${config.title}`} onClose={() => setOpen(false)}><div className="module-form">{config.fields.map(field => field.type === 'select' ? <label key={field.key} className="ui-field"><span>{field.label}{field.required ? ' *' : ''}</span><select value={form[field.key] || ''} onChange={e => setForm(prev => ({ ...prev, [field.key]: e.target.value }))}><option value="">Pilih {field.label.toLowerCase()}</option>{(options[field.source || ''] || []).map(option => <option key={option.id} value={option.id}>{option.name}</option>)}</select></label> : <Input key={field.key} label={`${field.label}${field.required ? ' *' : ''}`} type={field.type === 'number' ? 'number' : 'text'} value={form[field.key] || ''} onChange={e => setForm(prev => ({ ...prev, [field.key]: e.target.value }))} />)}<Button onClick={save} disabled={saving}>{saving ? 'Menyimpan…' : editing ? 'Simpan perubahan' : 'Simpan'}</Button></div></Modal> : null}
+
+    {config.fields?.length ? <Modal open={open} title={editing ? `Edit ${config.title}` : `Tambah ${config.title}`} onClose={() => setOpen(false)}>
+      <div className={styles.formIntro}><strong>{editing ? 'Perbarui data dengan hati-hati.' : `Tambah ${config.title.toLowerCase()} baru.`}</strong><span>Data master yang sudah dipakai transaksi tidak dihapus dari histori. Gunakan Nonaktifkan jika tidak ingin dipakai lagi.</span></div>
+      <div className="module-form">
+        {config.fields.map(field => field.type === 'select' ? <label key={field.key} className="ui-field"><span>{field.label}{field.required ? ' *' : ''}</span><select value={form[field.key] || ''} onChange={e => setForm(prev => ({ ...prev, [field.key]: e.target.value }))}><option value="">Pilih {field.label.toLowerCase()}</option>{(options[field.source || ''] || []).map(option => <option key={option.id} value={option.id}>{option.name}</option>)}</select>{field.help ? <small>{field.help}</small> : null}</label> : <div key={field.key}><Input label={`${field.label}${field.required ? ' *' : ''}`} type={field.type === 'number' ? 'number' : 'text'} value={form[field.key] || ''} placeholder={field.placeholder} onChange={e => setForm(prev => ({ ...prev, [field.key]: e.target.value }))} />{field.help ? <small className={styles.fieldHelp}>{field.help}</small> : null}</div>)}
+        <div className={styles.formActions}><Button variant="secondary" onClick={() => setOpen(false)} disabled={saving}>Batal</Button><Button onClick={save} disabled={saving}>{saving ? 'Menyimpan…' : editing ? 'Simpan perubahan' : 'Simpan data'}</Button></div>
+      </div>
+    </Modal> : null}
   </div>
 }
