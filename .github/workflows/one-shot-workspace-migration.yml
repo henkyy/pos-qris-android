@@ -1,0 +1,40 @@
+name: One-shot workspace scope migration
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    if: ${{ !contains(github.event.head_commit.message, 'workspace scope migration applied') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Apply migration
+        run: python scripts/migrate-workspace-scope.py
+      - name: Verify no legacy business lookup remains in target modules
+        run: |
+          ! grep -n "TOKO_MAJU_JAYA" app/sales-terminal.tsx features/purchases/PurchaseWorkspace.tsx
+          grep -n "getActiveWorkspace" app/sales-terminal.tsx features/purchases/PurchaseWorkspace.tsx
+          grep -n "eq('location_id', locationIdNext)" app/sales-terminal.tsx
+          grep -n "eq('branch_id',brid)" features/purchases/PurchaseWorkspace.tsx
+      - name: Build check
+        run: |
+          npm ci
+          npm run build
+      - name: Commit migration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f scripts/migrate-workspace-scope.py .github/workflows/one-shot-workspace-migration.yml
+          git add app/sales-terminal.tsx features/purchases/PurchaseWorkspace.tsx scripts/migrate-workspace-scope.py .github/workflows/one-shot-workspace-migration.yml
+          git commit -m "chore(workspace): apply workspace scope migration applied" || exit 0
+          git push
