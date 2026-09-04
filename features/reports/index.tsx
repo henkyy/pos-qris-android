@@ -48,7 +48,7 @@ export default function ReportsPage() {
         if (locationError) throw locationError
         const activeLocationId = locations?.[0]?.id
         if (!activeLocationId) console.warn(`Lokasi stok aktif untuk cabang ${String(branch.name || branch.code || branch.id)} belum dikonfigurasi.`)
-        const since = new Date() since.setHours(0, 0, 0, 0); since.setDate(since.getDate() - (period - 1))
+        const since = new Date(); since.setHours(0, 0, 0, 0); since.setDate(since.getDate() - (period - 1))
         const [sales, products, purchases, receipts, receivables, payments, methods, stock] = await Promise.all([
           db.from('sales').select('id,sale_no,sale_date,total_amount,hpp_amount,margin_amount,status').eq('business_id', business.id).eq('branch_id', branch.id).gte('sale_date', since.toISOString()).order('sale_date', { ascending: true }).limit(2000),
           db.from('products').select('id,name,sku,current_cost,reorder_point,min_stock,cost_method').eq('business_id', business.id).limit(2000),
