@@ -20,7 +20,7 @@ jobs:
           python-version: '3.x'
       - name: Apply migration
         run: python scripts/migrate-workspace-scope.py
-      - name: Verify no legacy business lookup remains in target modules
+      - name: Verify scope migration
         run: |
           ! grep -n "TOKO_MAJU_JAYA" app/sales-terminal.tsx features/purchases/PurchaseWorkspace.tsx
           grep -n "getActiveWorkspace" app/sales-terminal.tsx features/purchases/PurchaseWorkspace.tsx
@@ -28,7 +28,7 @@ jobs:
           grep -n "eq('branch_id',brid)" features/purchases/PurchaseWorkspace.tsx
       - name: Build check
         run: |
-          npm ci
+          npm install
           npm run build
       - name: Commit migration
         run: |
