@@ -1,0 +1,15 @@
+.reset-card { border-color: #f0d8d8; }
+.reset-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.reset-actions button, .reset-dialog-actions button { border: 1px solid #e3e8f0; border-radius: 10px; padding: 10px 14px; background: #fff; font-weight: 750; }
+.reset-secondary { color: #8a5a1f; background: #fffaf2 !important; border-color: #efd9b2 !important; }
+.reset-danger { color: #fff; background: #c93636 !important; border-color: #c93636 !important; }
+.reset-message { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: #ecfbf4; border: 1px solid #c9f1df; color: #11724e; font-size: 12px; }
+.reset-overlay { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 18px; background: #10182799; }
+.reset-dialog { width: min(560px, 100%); background: #fff; border-radius: 18px; padding: 20px; box-shadow: 0 25px 70px #10182755; }
+.reset-dialog h2 { margin: 5px 0 10px; }
+.reset-dialog p { color: #5e6b80; font-size: 12px; line-height: 1.6; }
+.reset-warning { padding: 11px 12px; border-radius: 10px; background: #fff5e8; border: 1px solid #efd9b2; color: #8a5a1f !important; }
+.reset-dialog input { width: 100%; border: 1px solid #dfe5ee; border-radius: 10px; padding: 11px 12px; outline: none; text-transform: uppercase; }
+.reset-dialog input:focus { border-color: #c93636; box-shadow: 0 0 0 3px #c9363614; }
+.reset-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+@media (max-width: 600px) { .reset-dialog-actions { flex-direction: column-reverse; } .reset-dialog-actions button { width: 100%; } }
