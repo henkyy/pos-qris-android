@@ -1,1 +1,34 @@
-.entity-polish{display:grid;gap:18px}.entity-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.entity-metric{background:#fff;border:1px solid #e7ebf2;border-radius:14px;padding:14px 16px}.entity-metric span,.entity-metric small{display:block;color:#7b8799;font-size:11px}.entity-metric strong{display:block;margin:5px 0 3px;font-size:24px;letter-spacing:-.03em}.entity-toolbar{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:16px 17px;border-bottom:1px solid #edf0f4}.entity-actions{display:flex;align-items:center;gap:8px}.entity-search{display:flex;align-items:center;gap:7px;width:min(260px,35vw);height:38px;padding:0 10px;border:1px solid #e0e6ef;border-radius:10px;background:#f9fafc;color:#8a95a7}.entity-search input{min-width:0;width:100%;border:0;outline:0;background:transparent;font-size:12px}.entity-card{padding:0;overflow:hidden}.entity-toolbar strong,.entity-toolbar span{display:block}.entity-toolbar span{margin-top:4px;color:#8a95a7;font-size:11px}.entity-success{color:#168258;font-weight:700}.entity-warning{color:#a6651d;font-weight:700}.entity-danger{color:#a42a2a;font-weight:700}.entity-muted{color:#8a95a7;font-weight:700}@media(max-width:760px){.entity-metrics{grid-template-columns:1fr}.entity-toolbar{align-items:stretch;flex-direction:column}.entity-actions{width:100%}.entity-search{width:100%;flex:1}}
+/* Shared visual system for non-terminal modules. */
+.module-page{gap:18px}
+.module-hero{padding:2px 2px 0;margin-bottom:0}
+.module-hero h1{font-size:30px;letter-spacing:-.04em}
+.module-hero p{font-size:12px;line-height:1.55}
+.module-card{border-radius:18px;box-shadow:0 8px 28px rgba(23,32,51,.045);overflow:hidden}
+.module-card-head{padding:2px 0 14px}
+.module-card-head strong{font-size:14px;color:#172033}
+.module-card-head span{font-size:10px}
+.ui-table-wrap{margin:0 -17px -17px;overflow:auto}
+.ui-table{min-width:720px;border-collapse:separate;border-spacing:0}
+.ui-table th{padding:12px 14px;background:#f8fafc;border-bottom:1px solid #e8edf4;font-size:9px;color:#7f8ba0;white-space:nowrap}
+.ui-table td{padding:13px 14px;background:#fff;border-bottom:1px solid #eef1f5;font-size:12px;color:#334057;vertical-align:middle}
+.ui-table tbody tr:hover td{background:#fbfcff}
+.ui-table tbody tr:last-child td{border-bottom:0}
+.table-edit{border:1px solid #dfe6f2;background:#fff;color:#315efb;border-radius:8px;padding:6px 9px;font-size:10px;font-weight:800}
+.table-edit:hover{background:#eef3ff}
+.module-alert{box-shadow:0 5px 18px rgba(164,42,42,.05)}
+.module-form{padding-top:2px}
+
+/* Give the stock module a useful visual hierarchy even before a richer inventory view exists. */
+.module-page .ui-table td:first-child{font-weight:650;color:#27334a}
+.module-page .ui-table td:nth-child(3){font-weight:800;color:#172033}
+
+/* Existing shared cards become consistent across dashboard, reports and settings. */
+.report-card,.setting-card{border:1px solid #e7ebf2;border-radius:14px;background:#fff;padding:16px;box-shadow:0 6px 22px rgba(23,32,51,.035)}
+.report-card:hover,.setting-card:hover{border-color:#dce4f2;transform:translateY(-1px)}
+
+@media(max-width:760px){
+  .module-hero h1{font-size:25px}
+  .module-card{border-radius:14px;padding:14px}
+  .ui-table-wrap{margin:0 -14px -14px}
+  .ui-table{min-width:650px}
+}
