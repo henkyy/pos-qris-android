@@ -1,6 +1,6 @@
 /* Shared visual system for non-terminal modules. */
-.module-page{gap:18px}
-.module-hero{padding:2px 2px 0;margin-bottom:0}
+.module-page{gap:18px;padding:30px 32px 40px;max-width:1480px;margin:0 auto;box-sizing:border-box}
+.module-hero{padding:0;margin-bottom:2px}
 .module-hero h1{font-size:30px;letter-spacing:-.04em}
 .module-hero p{font-size:12px;line-height:1.55}
 .module-card{border-radius:18px;box-shadow:0 8px 28px rgba(23,32,51,.045);overflow:hidden}
@@ -26,7 +26,12 @@
 .report-card,.setting-card{border:1px solid #e7ebf2;border-radius:14px;background:#fff;padding:16px;box-shadow:0 6px 22px rgba(23,32,51,.035)}
 .report-card:hover,.setting-card:hover{border-color:#dce4f2;transform:translateY(-1px)}
 
+@media(max-width:1000px){
+  .module-page{padding:26px 24px 34px}
+}
+
 @media(max-width:760px){
+  .module-page{padding:20px 16px 30px;gap:14px}
   .module-hero h1{font-size:25px}
   .module-card{border-radius:14px;padding:14px}
   .ui-table-wrap{margin:0 -14px -14px}
