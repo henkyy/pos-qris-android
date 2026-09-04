@@ -39,13 +39,13 @@ export const entityConfigs: Record<string, EntityConfig> = {
     ],
   },
   categories: {
-    title: 'Kategori', eyebrow: 'MASTER · PRODUK', description: 'Atur pengelompokan produk untuk kasir, pencarian dan laporan.', table: 'categories', columns: ['name', 'code', 'is_active'], columnLabels: { name: 'Nama Kategori', code: 'Kode', is_active: 'Status' },
+    title: 'Kategori', eyebrow: 'MASTER · PRODUK', description: 'Atur pengelompokan produk untuk kasir, pencarian dan laporan.', table: 'categories', columns: ['name', 'code', 'is_active'], columnLabels: { name: 'Nama Kategori', code: 'Kode Kategori', is_active: 'Status' },
     businessScoped: true, softDelete: true, workflow: ['Buat kategori', 'Hubungkan produk', 'Gunakan di kasir', 'Analisis laporan'], usageNote: 'Nonaktifkan kategori jika tidak ingin dipakai untuk produk baru. Produk dan transaksi lama tetap aman.',
     fields: [{ key: 'name', label: 'Nama kategori', required: true }, { key: 'code', label: 'Kode kategori', required: true }],
   },
   units: {
     title: 'Satuan', eyebrow: 'MASTER · PRODUK', description: 'Kelola satuan dasar dan aturan angka desimal untuk produk.', table: 'units', columns: ['name', 'code', 'symbol', 'decimal_places'], columnLabels: { name: 'Nama Satuan', code: 'Kode', symbol: 'Simbol', decimal_places: 'Desimal' },
-    businessScoped: true, softDelete: true, workflow: ['Buat satuan', 'Hubungkan ke produk', 'Gunakan di transaksi'], usageNote: 'Jangan menonaktifkan satuan yang masih dibutuhkan produk aktif. Perubahan satuan transaksi historis tidak dilakukan dari master.',
+    businessScoped: true, softDelete: false, workflow: ['Buat satuan', 'Hubungkan ke produk', 'Gunakan di transaksi'], usageNote: 'Satuan tidak memiliki kolom is_active pada schema saat ini. Karena satuan direferensikan produk dan item transaksi, penghapusan harus ditangani oleh constraint database, bukan tombol hapus generik.',
     fields: [{ key: 'name', label: 'Nama satuan', required: true }, { key: 'code', label: 'Kode satuan', required: true }, { key: 'symbol', label: 'Simbol' }, { key: 'decimal_places', label: 'Jumlah desimal', type: 'number' }],
   },
   stock: { title: 'Stok', eyebrow: 'PERSEDIAAN', description: 'Pantau posisi stok per lokasi. Koreksi stok dilakukan melalui adjustment, penerimaan atau transfer agar histori tetap terlacak.', table: 'stock_balances', columns: ['product_id', 'location_id', 'qty_base'], columnLabels: { product_id: 'Produk', location_id: 'Lokasi', qty_base: 'Stok' }, readOnly: true, workflow: ['Pantau stok', 'Stock opname', 'Adjustment / transfer', 'Replenishment'], usageNote: 'Saldo stok bukan data yang diedit bebas. Setiap koreksi harus melalui transaksi persediaan agar laporan dan histori tetap konsisten.' },
