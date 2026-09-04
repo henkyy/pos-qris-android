@@ -39,6 +39,10 @@ export default function DashboardPage() {
       try {
         const db = requireSupabase()
         const { business, branch } = await getActiveWorkspace()
+        const { data: locations, error: locationError } = await db.from('locations').select('id,name,code').eq('branch_id', branch.id).eq('is_active', true).order('name').limit(1)
+        if (locationError) throw locationError
+        const activeLocationId = locations?.[0]?.id
+        if (!activeLocationId) throw new Error(`Lokasi stok aktif untuk cabang ${String(branch.name || branch.code || branch.id)} tidak ditemukan.`)
         const since = new Date()
         since.setDate(since.getDate() - 30)
 
@@ -46,7 +50,7 @@ export default function DashboardPage() {
           db.from('sales').select('sale_no,sale_date,total_amount,status,customer_id').eq('business_id', business.id).eq('branch_id', branch.id).gte('sale_date', since.toISOString()).order('sale_date', { ascending: false }).limit(500),
           db.from('purchase_orders').select('order_no,order_date,total_amount,status,supplier_id').eq('business_id', business.id).eq('branch_id', branch.id).gte('order_date', since.toISOString()).order('order_date', { ascending: false }).limit(300),
           db.from('receivables').select('invoice_no,customer_id,outstanding_amount,due_date,status').eq('business_id', business.id).eq('branch_id', branch.id).gt('outstanding_amount', 0).order('due_date', { ascending: true }).limit(200),
-          db.from('stock_balances').select('product_id,location_id,qty_base,reserved_qty').limit(1000),
+          db.from('stock_balances').select('product_id,location_id,qty_base,reserved_qty').eq('location_id', activeLocationId).limit(1000),
           db.from('products').select('id,name,sku,reorder_point,min_stock').eq('business_id', business.id).eq('is_active', true).limit(1000),
           db.from('payments').select('amount,status,payment_method_id,paid_at').eq('business_id', business.id).eq('branch_id', branch.id).gte('created_at', since.toISOString()).limit(500),
           db.from('customers').select('id', { count: 'exact', head: true }).eq('business_id', business.id).eq('is_active', true),
