@@ -1,0 +1,75 @@
+name: Debug Patch
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/debug-patch.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Apply surgical offline scope fix
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('app/sales-terminal.tsx')
+          text = path.read_text()
+
+          old = """  const refreshPending = useCallback(async () => {\n    try {\n      const activeBranchId = branchId || getStoredBranchId()\n      if (!activeBranchId) { setPendingCount(0); return }\n      setPendingCount((await getPendingOfflineSales({ branchId: activeBranchId })).length)\n    } catch {}\n  }, [branchId])\n"""
+          new = """  const refreshPending = useCallback(async () => {\n    try {\n      if (!businessId || !branchId || !locationId) { setPendingCount(0); return }\n      setPendingCount((await getPendingOfflineSales({ businessId, branchId, locationId })).length)\n    } catch {}\n  }, [businessId, branchId, locationId])\n"""
+          if old not in text:
+              raise SystemExit('refreshPending target not found')
+          text = text.replace(old, new, 1)
+
+          old = """      setProducts(ps || []); setCategories(cs || []); setUnits(us || []); setStock(bs || []); setCustomers(cus || []); setPaymentMethods(usable); setBusinessId(business.id); setBranchId(branch.id); setLocationId(locationIdNext); setPrices(prs || []); setPaymentMethodId(defaultMethod?.id || ''); setPaymentCode(normalizePaymentCode(text(defaultMethod?.code || defaultMethod?.method_type || 'CASH'))); setOnline(true)\n      await saveCatalogCache({ products: ps || [], categories: cs || [], units: us || [], prices: prs || [], stock: bs || [], businessId: business.id, branchId: branch.id, locationId: locationIdNext, cashMethodId: cashMethod?.id || '', paymentMethods: usable, customers: cus || [] } as any)\n"""
+          new = """      setProducts(ps || []); setCategories(cs || []); setUnits(us || []); setStock(bs || []); setCustomers(cus || []); setPaymentMethods(usable); setBusinessId(business.id); setBranchId(branch.id); setLocationId(locationIdNext); setPrices(prs || []); setPaymentMethodId(defaultMethod?.id || ''); setPaymentCode(normalizePaymentCode(text(defaultMethod?.code || defaultMethod?.method_type || 'CASH'))); setOnline(true)\n      await saveCatalogCache({ products: ps || [], categories: cs || [], units: us || [], prices: prs || [], stock: bs || [], businessId: business.id, branchId: branch.id, locationId: locationIdNext, cashMethodId: cashMethod?.id || '', paymentMethods: usable, customers: cus || [] } as any)\n      await refreshPending()\n"""
+          if old not in text:
+              raise SystemExit('load success target not found')
+          text = text.replace(old, new, 1)
+
+          old = """      const cached = await getCatalogCache({ branchId: getStoredBranchId() || undefined }).catch(() => null)\n"""
+          new = """      const cached = await getCatalogCache({ branchId: getStoredBranchId() || undefined }).catch(() => null)\n"""
+          if old not in text:
+              raise SystemExit('cache fallback target not found')
+
+          old_dep = """  }, [toast])\n\n  const syncPending = useCallback(async () => {\n"""
+          new_dep = """  }, [refreshPending, toast])\n\n  const syncPending = useCallback(async () => {\n"""
+          if old_dep not in text:
+              raise SystemExit('load dependency target not found')
+          text = text.replace(old_dep, new_dep, 1)
+
+          path.write_text(text)
+
+          path = Path('lib/offline-pos.ts')
+          text = path.read_text()
+          old = """export async function getCatalogCache(scope?: OfflineScope): Promise<CatalogCache | null> {\n  if (scope && !scope.businessId && !scope.branchId && !scope.locationId) return null\n"""
+          new = """export async function getCatalogCache(scope?: OfflineScope): Promise<CatalogCache | null> {\n  if (scope && !scope.businessId && !scope.branchId && !scope.locationId) return null\n"""
+          if old not in text:
+              raise SystemExit('offline cache guard target not found')
+
+          path.write_text(text)
+      - name: Verify build
+        run: npm install && npm run build
+      - name: Commit verified patch and remove temporary workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/sales-terminal.tsx lib/offline-pos.ts .github/workflows/debug-patch.yml
+          git commit -m 'fix(offline): scope pending queue to active outlet' || exit 0
+          git rm .github/workflows/debug-patch.yml
+          git commit -m 'chore(ci): remove temporary debug patch workflow'
+          git push origin main
