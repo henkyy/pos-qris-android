@@ -1,6 +1,9 @@
 name: Refactor navigation scope
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - 'components/layout/AppShell.tsx'
 permissions:
   contents: write
 jobs:
@@ -45,7 +48,7 @@ const groups = ['DASHBOARD', 'TRANSAKSI', 'INVENTORI', 'PEMBELIAN', 'PELANGGAN',
 '''
           t, n = re.subn(r"type MenuId =.*?const groups = \[[\s\S]*?\]\n\n", block, t, count=1)
           if n != 1: raise SystemExit('menu block not found')
-          t, n = re.subn(r"function renderFeature\(active: MenuId, mode: ViewMode, workspaceVersion: number\) \{[\s\S]*?\n\}\n\n", '''function renderFeature(active: MenuId, mode: ViewMode, workspaceVersion: number) {
+          render = '''function renderFeature(active: MenuId, mode: ViewMode, workspaceVersion: number) {
   const key = `${workspaceVersion}-${mode}`
   switch (active) {
     case 'Dashboard': return <DashboardPage key={key} />
@@ -64,7 +67,8 @@ const groups = ['DASHBOARD', 'TRANSAKSI', 'INVENTORI', 'PEMBELIAN', 'PELANGGAN',
   }
 }
 
-''', t, count=1)
+'''
+          t, n = re.subn(r"function renderFeature\(active: MenuId, mode: ViewMode, workspaceVersion: number\) \{[\s\S]*?\n\}\n\n", render, t, count=1)
           if n != 1: raise SystemExit('render block not found')
           t = t.replace("const [active, setActive] = useState<MenuId>('Penjualan')", "const [active, setActive] = useState<MenuId>('Dashboard')")
           t = t.replace("const disabled = 'disabled' in menu && Boolean((menu as Menu & { disabled?: boolean }).disabled)", "const disabled = Boolean(menu.disabled)")
