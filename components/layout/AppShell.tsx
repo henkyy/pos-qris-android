@@ -24,7 +24,7 @@ type Branch = Record<string, any>
 const menus: Menu[] = [
   { id: 'Dashboard', label: 'Dashboard', icon: '⌂', group: 'DASHBOARD', desc: 'Ringkasan bisnis' },
   { id: 'Penjualan', label: 'Kasir', icon: '▣', group: 'TRANSAKSI', desc: 'Transaksi penjualan' },
-  { id: 'Pesanan', label: 'Penjualan', icon: '▤', group: 'TRANSAKSI', desc: 'Riwayat penjualan' },
+  { id: 'Penjualan', label: 'Penjualan', icon: '▤', group: 'TRANSAKSI', desc: 'Riwayat penjualan' },
   { id: 'Pesanan', label: 'Pesanan', icon: '◫', group: 'TRANSAKSI', desc: 'Pesanan berjalan' },
   { id: 'Pembayaran', label: 'Pembayaran', icon: '◉', group: 'TRANSAKSI', desc: 'Status pembayaran' },
   { id: 'Produk', label: 'Produk', icon: '□', group: 'INVENTORI', desc: 'Produk & harga' },
