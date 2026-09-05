@@ -14,7 +14,7 @@ import ReportsPage from '../../features/reports'
 import PaymentsPage from '../../features/payments'
 import SettingsPage from '../../features/settings'
 import WorkspaceMenuPage, { type WorkspaceMenuId } from '../../features/workspace-menu'
-import OperationsPage, { type OperationsMenuId } from '../../features/operations'
+import OperationsPage from '../../features/operations'
 import { getAccessibleBranches, getActiveWorkspace, setStoredBranchId } from '../../lib/business-context'
 import styles from '../../app/app-shell.module.css'
 
@@ -69,7 +69,7 @@ const menuItems: Menu[] = [
   { id: 'Pengaturan Sistem', label: 'Pengaturan Sistem', icon: '⚙', group: 'PENGATURAN', description: 'Konfigurasi sistem aplikasi' },
 ]
 
-const groups: { id: GroupId; items: Menu[] }[] = ['TRANSAKSI', 'INVENTORI', 'PEMBELIAN', 'PELANGGAN', 'KEUANGAN', 'LAPORAN', 'MANAJEMEN', 'PENGATURAN'].map(id => ({ id, items: menuItems.filter(item => item.group === id) }))
+const groups: { id: GroupId; items: Menu[] }[] = ['TRANSAKSI', 'INVENTORI', 'PEMBELIAN', 'PELANGGAN', 'KEUANGAN', 'LAPORAN', 'MANAJEMEN', 'PENGATURAN'].map(id => ({ id: id as GroupId, items: menuItems.filter(item => item.group === id) }))
 const dashboardMenu: Menu = { id: 'Dashboard', label: 'Dashboard', icon: '⌂', group: 'TRANSAKSI', description: 'Ringkasan bisnis' }
 const mobileItems = [dashboardMenu, menuItems.find(item => item.id === 'Kasir'), menuItems.find(item => item.id === 'Stok'), menuItems.find(item => item.id === 'Laporan Penjualan')].filter((item): item is Menu => Boolean(item))
 
@@ -168,9 +168,7 @@ export default function AppShell() {
         </div> })}
       </nav>
     </aside>
-    <main className={styles.main}>
-      {renderFeature(active, mode, version)}
-    </main>
+    <main className={styles.main}>{renderFeature(active, mode, version)}</main>
     <div className={styles.mobileBar}>
       {mobileItems.map(item => <button type="button" key={item.id} className={`${styles.mobileButton} ${active === item.id ? styles.mobileActive : ''}`} onClick={() => selectMenu(item.id)}><span className={styles.mobileIcon}>{item.icon}</span><span>{item.label}</span></button>)}
       <button type="button" className={styles.mobileButton} onClick={() => setMobileOpen(true)}><span className={styles.mobileIcon}>☰</span><span>Menu</span></button>
