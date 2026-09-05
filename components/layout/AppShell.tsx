@@ -63,7 +63,7 @@ const menuItems: Menu[] = [
 ]
 
 const groups: { id: GroupId; items: Menu[] }[] = ['TRANSAKSI', 'INVENTORI', 'PEMBELIAN', 'PELANGGAN', 'LAPORAN', 'MANAJEMEN', 'PENGATURAN'].map(id => ({
-  id,
+  id: id as GroupId,
   items: menuItems.filter(item => item.group === id),
 }))
 
