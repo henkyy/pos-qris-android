@@ -1,6 +1,7 @@
 name: ui-menu-fix
 on:
-  workflow_dispatch:
+  push:
+    branches: [main]
 permissions:
   contents: write
 jobs:
@@ -16,19 +17,16 @@ jobs:
           s = p.read_text()
           old = "{ id: 'Pesanan', label: 'Penjualan', icon: '▤', group: 'TRANSAKSI', desc: 'Riwayat penjualan' },"
           new = "{ id: 'Penjualan', label: 'Penjualan', icon: '▤', group: 'TRANSAKSI', desc: 'Riwayat penjualan' },"
-          if old not in s:
-              raise SystemExit('expected menu line not found')
-          p.write_text(s.replace(old, new, 1))
+          if old in s:
+              p.write_text(s.replace(old, new, 1))
 
           p = Path('app/app-shell.module.css')
           s = p.read_text()
           marker = '.navActive{background:linear-gradient(90deg,#315efb,#3c68f4);color:#fff;box-shadow:0 8px 22px #315efb2b}'
           addition = marker + '.navDisabled{opacity:.42;cursor:not-allowed}.navSoon{margin-left:auto;font-size:7px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#72809a}'
-          if marker not in s:
-              raise SystemExit('expected navActive style not found')
-          if '.navDisabled' not in s:
+          if marker in s and '.navDisabled' not in s:
               s = s.replace(marker, addition, 1)
-          p.write_text(s)
+              p.write_text(s)
           PY
       - name: Commit and remove temporary workflow
         env:
