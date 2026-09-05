@@ -28,7 +28,7 @@ const menuItems: Menu[] = [
   { id: 'Kasir', label: 'Kasir', icon: '▣', group: 'TRANSAKSI', description: 'Buat dan proses transaksi penjualan' },
   { id: 'Held Sales', label: 'Held Sales', icon: 'Ⅱ', group: 'TRANSAKSI', description: 'Lihat transaksi yang ditahan di terminal ini' },
   { id: 'Penjualan', label: 'Penjualan', icon: '▤', group: 'TRANSAKSI', description: 'Riwayat dan detail penjualan' },
-  { id: 'Retur Penjualan', label: 'Retur Penjualan', icon: '↩', group: 'TRANSAKSI', description: 'Kelola retur dan refund penjualan' },
+  { id: 'Retur Penjualan', label: 'Retur Penjualan', icon: '↩', group: 'TRANSAKSI', description: 'Pantau retur dan refund penjualan' },
   { id: 'Pesanan', label: 'Pesanan', icon: '◫', group: 'TRANSAKSI', description: 'Pantau status pesanan' },
   { id: 'Pembayaran', label: 'Pembayaran', icon: '◉', group: 'TRANSAKSI', description: 'Pantau pembayaran transaksi' },
   { id: 'Produk', label: 'Produk', icon: '□', group: 'INVENTORI', description: 'Kelola katalog produk' },
@@ -78,7 +78,7 @@ function renderFeature(active: MenuId, mode: ViewMode, version: number) {
   switch (active) {
     case 'Dashboard': return <DashboardPage key={key} />
     case 'Kasir': return <SalesTerminal key={key} />
-    case 'Held Sales': return <OperationsPage key={key} menu={'Held Sales' as OperationsMenuId} />
+    case 'Held Sales': return <OperationsPage key={key} menu="Held Sales" />
     case 'Penjualan':
     case 'Riwayat Transaksi': return <WorkspaceMenuPage key={key} menu="Riwayat Transaksi" />
     case 'Retur Penjualan': return <OperationsPage key={key} menu="Retur Penjualan" />
@@ -159,25 +159,27 @@ export default function AppShell() {
         </select>
       </div>
       <nav className={styles.nav} aria-label="Navigasi utama">
-        <button type="button" className={`${styles.navButton} ${active === 'Dashboard' ? styles.navActive : ''}`} onClick={() => selectMenu('Dashboard')} title={collapsed ? dashboardMenu.description : undefined}><span className={styles.icon}>⌂</span><span className={styles.navText}>Dashboard</span>{active === 'Dashboard' && <span className={styles.activeMark} />}</button>
+        <div className={styles.navTopItem}>
+          <button type="button" className={`${styles.navButton} ${active === 'Dashboard' ? styles.navActive : ''}`} onClick={() => selectMenu('Dashboard')} title={collapsed ? dashboardMenu.description : undefined}><span className={styles.icon}>⌂</span><span className={styles.navText}>Dashboard</span>{active === 'Dashboard' && <span className={styles.activeMark} />}</button>
+        </div>
         {groups.map(group => { const expanded = Boolean(open[group.id]); return <div key={group.id} className={styles.navGroup}>
-          <button type="button" className={styles.navGroupHeader} onClick={() => toggleGroup(group.id)} aria-expanded={expanded}><span className={styles.navLabel}>{group.id}</span><span className={styles.navGroupChevron}>{expanded ? '⌄' : '›'}</span></button>
+          <button type="button" className={`${styles.navGroupButton} ${expanded ? styles.navGroupButtonActive : ''}`} onClick={() => toggleGroup(group.id)} aria-expanded={expanded}><span className={styles.navLabel}>{group.id}</span><span className={styles.navGroupChevron}>{expanded ? '⌄' : '›'}</span></button>
           {expanded && <div className={styles.navGroupChildren}>{group.items.map(item => <button type="button" key={item.id} className={`${styles.navButton} ${active === item.id ? styles.navActive : ''}`} onClick={() => selectMenu(item.id)} title={collapsed ? item.description : undefined}><span className={styles.icon}>{item.icon}</span><span className={styles.navText}>{item.label}</span>{active === item.id && <span className={styles.activeMark} />}</button>)}</div>}
         </div> })}
       </nav>
     </aside>
     <main className={styles.main}>
-      <div className={styles.mobileHeader}>
-        <button type="button" className={styles.mobileMenuButton} onClick={() => setMobileOpen(true)} aria-label="Buka menu">☰</button>
-        <div><strong>{businessName || 'QRIS POS'}</strong><span>{activeBranchName}</span></div>
-      </div>
-      <div className={styles.content}>{renderFeature(active, mode, version)}</div>
+      {renderFeature(active, mode, version)}
     </main>
-    {mobileOpen && <div className={styles.mobileOverlay} role="presentation" onClick={() => setMobileOpen(false)}>
-      <aside className={styles.mobileDrawer} role="dialog" aria-label="Menu navigasi" onClick={event => event.stopPropagation()}>
-        <div className={styles.mobileDrawerHead}><strong>Menu</strong><button type="button" onClick={() => setMobileOpen(false)} aria-label="Tutup menu">×</button></div>
-        {mobileItems.map(item => <button type="button" key={item.id} className={`${styles.navButton} ${active === item.id ? styles.navActive : ''}`} onClick={() => selectMenu(item.id)}><span className={styles.icon}>{item.icon}</span><span className={styles.navText}>{item.label}</span></button>)}
-      </aside>
+    <div className={styles.mobileBar}>
+      {mobileItems.map(item => <button type="button" key={item.id} className={`${styles.mobileButton} ${active === item.id ? styles.mobileActive : ''}`} onClick={() => selectMenu(item.id)}><span className={styles.mobileIcon}>{item.icon}</span><span>{item.label}</span></button>)}
+      <button type="button" className={styles.mobileButton} onClick={() => setMobileOpen(true)}><span className={styles.mobileIcon}>☰</span><span>Menu</span></button>
+    </div>
+    {mobileOpen && <div className={styles.mobileMenuBackdrop} role="presentation" onClick={() => setMobileOpen(false)}>
+      <div className={styles.mobileMenu} role="dialog" aria-modal="true" aria-label="Menu navigasi" onClick={event => event.stopPropagation()}>
+        <div className={styles.mobileMenuHead}><div><strong>Menu</strong><span>{businessName || 'QRIS POS'} · {activeBranchName}</span></div><button type="button" onClick={() => setMobileOpen(false)} aria-label="Tutup menu">×</button></div>
+        <div className={styles.mobileMenuGroupList}>{groups.map(group => <section key={group.id}><h3>{group.id}</h3><div className={styles.mobileMenuGrid}>{group.items.map(item => <button type="button" key={item.id} className={active === item.id ? styles.mobileMenuActive : ''} onClick={() => selectMenu(item.id)}><span>{item.icon}</span><strong>{item.label}</strong><small>{item.description}</small></button>)}</div></section>)}</div>
+      </div>
     </div>}
   </div>
 }
