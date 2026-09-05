@@ -1,0 +1,43 @@
+name: ui-menu-fix
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fix menu targets and disabled styling
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('components/layout/AppShell.tsx')
+          s = p.read_text()
+          old = "{ id: 'Pesanan', label: 'Penjualan', icon: '▤', group: 'TRANSAKSI', desc: 'Riwayat penjualan' },"
+          new = "{ id: 'Penjualan', label: 'Penjualan', icon: '▤', group: 'TRANSAKSI', desc: 'Riwayat penjualan' },"
+          if old not in s:
+              raise SystemExit('expected menu line not found')
+          p.write_text(s.replace(old, new, 1))
+
+          p = Path('app/app-shell.module.css')
+          s = p.read_text()
+          marker = '.navActive{background:linear-gradient(90deg,#315efb,#3c68f4);color:#fff;box-shadow:0 8px 22px #315efb2b}'
+          addition = marker + '.navDisabled{opacity:.42;cursor:not-allowed}.navSoon{margin-left:auto;font-size:7px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#72809a}'
+          if marker not in s:
+              raise SystemExit('expected navActive style not found')
+          if '.navDisabled' not in s:
+              s = s.replace(marker, addition, 1)
+          p.write_text(s)
+          PY
+      - name: Commit and remove temporary workflow
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add components/layout/AppShell.tsx app/app-shell.module.css
+          git commit -m 'fix(ui): keep POS menu targets consistent' || true
+          git rm .github/workflows/ui-menu-fix.yml
+          git commit -m 'chore(ci): remove temporary UI menu workflow'
+          git push
