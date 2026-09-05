@@ -22,47 +22,22 @@ type Menu = { id: MenuId; label: string; icon: string; group: string; desc: stri
 type Branch = Record<string, any>
 
 const menus: Menu[] = [
-  { id: 'Dashboard', label: 'Dashboard', icon: '⌂', group: 'DASHBOARD', desc: 'Ringkasan bisnis' },
-  { id: 'Penjualan', label: 'Kasir', icon: '▣', group: 'TRANSAKSI', desc: 'Transaksi penjualan' },
-  { id: 'Penjualan', label: 'Penjualan', icon: '▤', group: 'TRANSAKSI', desc: 'Riwayat penjualan' },
-  { id: 'Pesanan', label: 'Pesanan', icon: '◫', group: 'TRANSAKSI', desc: 'Pesanan berjalan' },
-  { id: 'Pembayaran', label: 'Pembayaran', icon: '◉', group: 'TRANSAKSI', desc: 'Status pembayaran' },
-  { id: 'Produk', label: 'Produk', icon: '□', group: 'INVENTORI', desc: 'Produk & harga' },
-  { id: 'Stok', label: 'Stok', icon: '▥', group: 'INVENTORI', desc: 'Persediaan' },
-  { id: 'Stok', label: 'Pergerakan Stok', icon: '↕', group: 'INVENTORI', desc: 'Riwayat mutasi stok' },
-  { id: 'Stok', label: 'Stok Opname', icon: '☷', group: 'INVENTORI', desc: 'Pemeriksaan fisik stok' },
-  { id: 'Stok', label: 'Penyesuaian Stok', icon: '±', group: 'INVENTORI', desc: 'Koreksi persediaan' },
-  { id: 'Pembelian', label: 'Purchase Order', icon: '⇩', group: 'PEMBELIAN', desc: 'Pesanan pembelian' },
-  { id: 'Pembelian', label: 'Penerimaan Barang', icon: '▾', group: 'PEMBELIAN', desc: 'Penerimaan barang' },
-  { id: 'Piutang', label: 'Hutang', icon: 'Rp', group: 'PEMBELIAN', desc: 'Tagihan supplier' },
-  { id: 'Supplier', label: 'Supplier', icon: '⇄', group: 'PEMBELIAN', desc: 'Pemasok barang' },
-  { id: 'Pelanggan', label: 'Pelanggan', icon: '♙', group: 'PELANGGAN', desc: 'Data pelanggan' },
-  { id: 'Piutang', label: 'Piutang', icon: 'Rp', group: 'PELANGGAN', desc: 'Tagihan pelanggan' },
-  { id: 'Pelanggan', label: 'Riwayat Transaksi', icon: '↺', group: 'PELANGGAN', desc: 'Riwayat transaksi pelanggan' },
-  { id: 'Laporan', label: 'Penjualan', icon: '▤', group: 'LAPORAN', desc: 'Laporan penjualan' },
-  { id: 'Laporan', label: 'Produk Terlaris', icon: '★', group: 'LAPORAN', desc: 'Performa produk' },
-  { id: 'Laporan', label: 'Stok', icon: '▥', group: 'LAPORAN', desc: 'Laporan persediaan' },
-  { id: 'Laporan', label: 'Pembelian', icon: '⇩', group: 'LAPORAN', desc: 'Laporan pembelian' },
-  { id: 'Laporan', label: 'Piutang', icon: 'Rp', group: 'LAPORAN', desc: 'Laporan piutang' },
-  { id: 'Laporan', label: 'Hutang', icon: 'Rp', group: 'LAPORAN', desc: 'Laporan hutang' },
-  { id: 'Laporan', label: 'Pengeluaran', icon: '−', group: 'LAPORAN', desc: 'Laporan pengeluaran' },
-  { id: 'Laporan', label: 'Laba & Margin', icon: '%', group: 'LAPORAN', desc: 'Profitabilitas bisnis' },
-  { id: 'Pengaturan', label: 'Cabang / Outlet', icon: '⌂', group: 'MANAJEMEN', desc: 'Workspace outlet aktif' },
-  { id: 'Pengaturan', label: 'Karyawan & Akses', icon: '♙', group: 'MANAJEMEN', desc: 'Segera tersedia', disabled: true } as Menu & { disabled?: boolean },
-  { id: 'Pengaturan', label: 'Shift Kasir', icon: '◷', group: 'MANAJEMEN', desc: 'Segera tersedia', disabled: true } as Menu & { disabled?: boolean },
-  { id: 'Pembayaran', label: 'Metode Pembayaran', icon: '◉', group: 'MANAJEMEN', desc: 'Metode pembayaran aktif' },
-  { id: 'Pengaturan', label: 'Audit Log', icon: '≡', group: 'MANAJEMEN', desc: 'Segera tersedia', disabled: true } as Menu & { disabled?: boolean },
-  { id: 'Pengaturan', label: 'Bisnis', icon: '◆', group: 'PENGATURAN', desc: 'Profil bisnis' },
-  { id: 'Pengaturan', label: 'Outlet', icon: '⌂', group: 'PENGATURAN', desc: 'Konfigurasi outlet' },
-  { id: 'Pengaturan', label: 'Satuan', icon: '◌', group: 'PENGATURAN', desc: 'Satuan produk' },
-  { id: 'Pengaturan', label: 'Kategori', icon: '▦', group: 'PENGATURAN', desc: 'Kategori produk' },
-  { id: 'Produk', label: 'Harga', icon: 'Rp', group: 'PENGATURAN', desc: 'Harga jual produk' },
-  { id: 'Pengaturan', label: 'QRIS', icon: '▣', group: 'PENGATURAN', desc: 'Konfigurasi QRIS' },
-  { id: 'Pengaturan', label: 'Pengaturan Sistem', icon: '⚙', group: 'PENGATURAN', desc: 'Konfigurasi aplikasi' },
+  { id: 'Dashboard', label: 'Dashboard', icon: '⌂', group: 'DASHBOARD', desc: 'Ringkasan bisnis outlet aktif' },
+  { id: 'Penjualan', label: 'Kasir', icon: '▣', group: 'TRANSAKSI', desc: 'Buat dan proses transaksi penjualan' },
+  { id: 'Pesanan', label: 'Pesanan', icon: '◫', group: 'TRANSAKSI', desc: 'Pantau status pesanan penjualan' },
+  { id: 'Pembayaran', label: 'Pembayaran', icon: '◉', group: 'TRANSAKSI', desc: 'Pantau pembayaran dan metode pembayaran' },
+  { id: 'Produk', label: 'Produk', icon: '□', group: 'INVENTORI', desc: 'Kelola katalog, satuan dan harga produk' },
+  { id: 'Stok', label: 'Stok', icon: '▥', group: 'INVENTORI', desc: 'Pantau saldo stok dan koreksi melalui alur persediaan' },
+  { id: 'Pembelian', label: 'Pembelian', icon: '⇩', group: 'PEMBELIAN', desc: 'Kelola PO, penerimaan barang dan hutang supplier' },
+  { id: 'Supplier', label: 'Supplier', icon: '⇄', group: 'PEMBELIAN', desc: 'Kelola pemasok dan termin pembayaran' },
+  { id: 'Pelanggan', label: 'Pelanggan', icon: '♙', group: 'PELANGGAN', desc: 'Kelola data pelanggan dan limit kredit' },
+  { id: 'Piutang', label: 'Piutang', icon: 'Rp', group: 'PELANGGAN', desc: 'Pantau tagihan pelanggan dan pembayaran' },
+  { id: 'Laporan', label: 'Laporan', icon: '▤', group: 'LAPORAN', desc: 'Analisis penjualan, stok, pembelian dan keuangan' },
+  { id: 'Pengaturan', label: 'Pengaturan', icon: '⚙', group: 'SISTEM', desc: 'Konfigurasi bisnis, outlet dan sistem' },
 ]
 
 const mobileMenus = menus.filter((x, index) => index === 0 || ['Kasir', 'Stok', 'Laporan'].includes(x.label)).filter((x, index, all) => all.findIndex(y => y.id === x.id) === index)
-const groups = ['DASHBOARD', 'TRANSAKSI', 'INVENTORI', 'PEMBELIAN', 'PELANGGAN', 'LAPORAN', 'MANAJEMEN', 'PENGATURAN']
+const groups = ['DASHBOARD', 'TRANSAKSI', 'INVENTORI', 'PEMBELIAN', 'PELANGGAN', 'LAPORAN', 'SISTEM']
 
 function renderFeature(active: MenuId, mode: ViewMode, workspaceVersion: number) {
   const key = `${workspaceVersion}-${mode}`
