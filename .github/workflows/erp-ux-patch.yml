@@ -1,0 +1,48 @@
+name: ERP UX Patch
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/erp-ux-patch.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Align purchase payment-term UX with persisted workflow
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('features/purchases/PurchaseWorkspace.tsx')
+          s = p.read_text()
+          old = "const [paymentTerm,setPaymentTerm]=useState<'PAID'|'CREDIT'>('PAID'); const [dueDate,setDueDate]=useState('');"
+          if old not in s: raise SystemExit('payment state target not found')
+          s = s.replace(old, '', 1)
+          old = "setPaymentTerm('PAID');setDueDate('');"
+          if old not in s: raise SystemExit('payment reset target not found')
+          s = s.replace(old, '', 1)
+          old = "onChange={e=>{setSupplierId(e.target.value);const s=suppliers.find(x=>x.id===e.target.value);if(s?.payment_term_days&&s.payment_term_days>0){setPaymentTerm('CREDIT');const d=new Date();d.setDate(d.getDate()+s.payment_term_days);setDueDate(d.toISOString().slice(0,10))}}}"
+          if old not in s: raise SystemExit('supplier change target not found')
+          s = s.replace(old, "onChange={e=>setSupplierId(e.target.value)}", 1)
+          start = s.find('<div className={styles.term}>')
+          end = s.find('<div className={styles.cart}>', start)
+          if start < 0 or end < 0: raise SystemExit('payment term block target not found')
+          replacement = '<div className={styles.term}><strong>Termin pembayaran ditentukan saat penerimaan</strong><span>Saat barang diterima, pilih Lunas atau Tempo berdasarkan invoice supplier dan jatuh tempo aktual.</span></div>'
+          s = s[:start] + replacement + s[end:]
+          p.write_text(s)
+      - name: Verify build
+        run: npm install && npm run build
+      - name: Commit and remove temporary workflow
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add features/purchases/PurchaseWorkspace.tsx .github/workflows/erp-ux-patch.yml
+          git commit -m 'fix(purchases): align payment term UX with receiving workflow'
+          git rm .github/workflows/erp-ux-patch.yml
+          git commit -m 'chore(ci): remove temporary ERP UX patch workflow'
+          git push origin main
