@@ -18,24 +18,24 @@ import styles from '../../app/app-shell.module.css'
 
 type MenuId = 'Dashboard' | 'Penjualan' | 'Pesanan' | 'Produk' | 'Stok' | 'Pelanggan' | 'Supplier' | 'Pembelian' | 'Piutang' | 'Laporan' | 'Pembayaran' | 'Pengaturan'
 type ViewMode = 'retail' | 'distributor' | 'fnb'
-type Menu = { id: MenuId; icon: string; group: string; desc: string }
+type Menu = { id: MenuId; label: string; icon: string; group: string; desc: string }
 type Branch = Record<string, any>
 
 const menus: Menu[] = [
-  { id: 'Dashboard', icon: '⌂', group: 'Utama', desc: 'Ringkasan bisnis' },
-  { id: 'Penjualan', icon: '▣', group: 'Transaksi', desc: 'Kasir & pembayaran' },
-  { id: 'Pesanan', icon: '▤', group: 'Transaksi', desc: 'Pesanan berjalan' },
-  { id: 'Pembelian', icon: '⇩', group: 'Transaksi', desc: 'Pembelian barang' },
-  { id: 'Piutang', icon: 'Rp', group: 'Transaksi', desc: 'Tagihan pelanggan' },
-  { id: 'Produk', icon: '□', group: 'Master', desc: 'Produk & harga' },
-  { id: 'Stok', icon: '▥', group: 'Master', desc: 'Persediaan barang' },
-  { id: 'Pelanggan', icon: '♙', group: 'Master', desc: 'Data pelanggan' },
-  { id: 'Supplier', icon: '⇄', group: 'Master', desc: 'Data supplier' },
-  { id: 'Laporan', icon: '▥', group: 'Analitik', desc: 'Penjualan & bisnis' },
-  { id: 'Pembayaran', icon: '◉', group: 'Analitik', desc: 'Metode & transaksi' },
-  { id: 'Pengaturan', icon: '⚙', group: 'Sistem', desc: 'Konfigurasi aplikasi' },
+  { id: 'Dashboard', label: 'Dashboard', icon: '⌂', group: 'Utama', desc: 'Ringkasan bisnis' },
+  { id: 'Penjualan', label: 'Kasir', icon: '▣', group: 'Transaksi', desc: 'Transaksi penjualan' },
+  { id: 'Pesanan', label: 'Pesanan', icon: '▤', group: 'Transaksi', desc: 'Pesanan berjalan' },
+  { id: 'Pembayaran', label: 'Pembayaran', icon: '◉', group: 'Transaksi', desc: 'Pembayaran transaksi' },
+  { id: 'Produk', label: 'Produk', icon: '□', group: 'Inventori', desc: 'Produk & harga' },
+  { id: 'Stok', label: 'Stok', icon: '▥', group: 'Inventori', desc: 'Persediaan & pergerakan' },
+  { id: 'Pembelian', label: 'Pembelian', icon: '⇩', group: 'Pembelian', desc: 'PO & penerimaan barang' },
+  { id: 'Supplier', label: 'Supplier', icon: '⇄', group: 'Pembelian', desc: 'Pemasok barang' },
+  { id: 'Pelanggan', label: 'Pelanggan', icon: '♙', group: 'Relasi', desc: 'Pelanggan & riwayat' },
+  { id: 'Piutang', label: 'Piutang', icon: 'Rp', group: 'Relasi', desc: 'Tagihan pelanggan' },
+  { id: 'Laporan', label: 'Laporan', icon: '▤', group: 'Analitik', desc: 'Penjualan & bisnis' },
+  { id: 'Pengaturan', label: 'Pengaturan', icon: '⚙', group: 'Sistem', desc: 'Konfigurasi aplikasi' },
 ]
-const mobileMenus = menus.filter(x => ['Dashboard', 'Penjualan', 'Laporan'].includes(x.id))
+const mobileMenus = menus.filter(x => ['Dashboard', 'Penjualan', 'Stok', 'Laporan'].includes(x.id))
 
 function renderFeature(active: MenuId, mode: ViewMode, workspaceVersion: number) {
   const key = `${workspaceVersion}-${mode}`
@@ -115,42 +115,70 @@ export default function AppShell() {
   }
 
   const activeBranch = branches.find(x => x.id === activeBranchId)
-  const activeBranchName = String(activeBranch?.name || activeBranch?.code || 'Cabang aktif')
+  const activeBranchName = String(activeBranch?.name || activeBranch?.code || 'Outlet aktif')
 
   return <div className={`${styles.shell} ${sidebarCollapsed ? styles.sidebarIsCollapsed : ''}`}>
     <aside className={styles.sidebar}>
       <div className={styles.brand}>
-        <div className={styles.brandMark}>P</div>
+        <div className={styles.brandMark}>Q</div>
         <div className={styles.brandCopy}>
-          <div className={styles.brandTitle}>POS QRIS</div>
+          <div className={styles.brandTitle}>QRIS POS</div>
           <div className={styles.brandSub}>{businessName || 'Bisnis'}</div>
         </div>
-        <button className={styles.collapseButton} onClick={toggleSidebar} aria-label="Sembunyikan menu kiri">{sidebarCollapsed ? '›' : '‹'}</button>
+        <button className={styles.collapseButton} onClick={toggleSidebar} aria-label={sidebarCollapsed ? 'Tampilkan menu kiri' : 'Sembunyikan menu kiri'}>{sidebarCollapsed ? '›' : '‹'}</button>
       </div>
 
-      <div className={styles.storeCard}>
-        <div className={styles.storeDot} />
-        <div className={styles.storeCopy}>
+      <div className={styles.workspaceCard}>
+        <div className={styles.workspaceIcon}>⌂</div>
+        <div className={styles.workspaceCopy}>
+          <span>OUTLET AKTIF</span>
           <strong>{activeBranchName}</strong>
-          <span>{branches.length > 1 ? `${branches.length} outlet terakses` : 'Outlet aktif'}</span>
         </div>
-        {branches.length > 1 ? (
-          <select
-            aria-label="Pilih outlet aktif"
-            value={activeBranchId}
-            onChange={e => selectBranch(e.target.value)}
-            style={{ maxWidth: 34, border: 0, background: 'transparent', color: 'inherit', cursor: 'pointer' }}
-          >
+        {branches.length > 1 && (
+          <select aria-label="Pilih outlet aktif" value={activeBranchId} onChange={e => selectBranch(e.target.value)}>
             {branches.map(branch => <option key={branch.id} value={branch.id}>{String(branch.name || branch.code || branch.id)}</option>)}
           </select>
-        ) : <span className={styles.chevron}>•</span>}
+        )}
       </div>
 
-      <nav className={styles.nav}>{['Utama', 'Transaksi', 'Master', 'Analitik', 'Sistem'].map(group => <div className={styles.navGroup} key={group}><div className={styles.navLabel}>{group}</div>{menus.filter(menu => menu.group === group).map(menu => <button key={menu.id} title={sidebarCollapsed ? menu.id : undefined} className={`${styles.navButton} ${active === menu.id ? styles.navActive : ''}`} onClick={() => selectMenu(menu.id)}><span className={styles.icon}>{menu.icon}</span><span className={styles.navText}>{menu.id}</span>{active === menu.id && <span className={styles.activeMark} />}</button>)}</div>)}</nav>
-      <div className={styles.sidebarFooter}><div className={styles.userAvatar}>O</div><div className={styles.userMeta}><strong>Owner</strong><span>Administrator</span></div><button className={styles.moreButton} aria-label="Opsi pengguna">•••</button></div>
+      <nav className={styles.nav} aria-label="Navigasi utama">
+        {['Utama', 'Transaksi', 'Inventori', 'Pembelian', 'Relasi', 'Analitik', 'Sistem'].map(group => (
+          <div className={styles.navGroup} key={group}>
+            <div className={styles.navLabel}>{group}</div>
+            {menus.filter(menu => menu.group === group).map(menu => (
+              <button key={menu.id} title={sidebarCollapsed ? menu.label : undefined} className={`${styles.navButton} ${active === menu.id ? styles.navActive : ''}`} onClick={() => selectMenu(menu.id)}>
+                <span className={styles.icon}>{menu.icon}</span>
+                <span className={styles.navText}>{menu.label}</span>
+                {active === menu.id && <span className={styles.activeMark} />}
+              </button>
+            ))}
+          </div>
+        ))}
+      </nav>
+
+      <div className={styles.sidebarFooter}>
+        <div className={styles.userAvatar}>O</div>
+        <div className={styles.userMeta}><strong>Owner</strong><span>Administrator</span></div>
+        <button className={styles.moreButton} aria-label="Opsi pengguna">•••</button>
+      </div>
     </aside>
+
     <main className={styles.main}>{renderFeature(active, salesMode, workspaceVersion)}</main>
-    {menuOpen && <div className={styles.mobileMenuBackdrop} onClick={() => setMenuOpen(false)}><div className={styles.mobileMenu} onClick={e => e.stopPropagation()}><div className={styles.mobileMenuHead}><div><strong>Menu POS</strong><span>Semua fitur aplikasi</span></div><button onClick={() => setMenuOpen(false)}>×</button></div><div className={styles.mobileMenuGrid}>{menus.map(menu => <button key={menu.id} className={active === menu.id ? styles.mobileMenuActive : ''} onClick={() => selectMenu(menu.id)}><span>{menu.icon}</span><strong>{menu.id}</strong><small>{menu.desc}</small></button>)}</div></div></div>}
-    <nav className={styles.mobileBar}>{mobileMenus.map(menu => <button key={menu.id} className={`${styles.mobileButton} ${active === menu.id ? styles.mobileActive : ''}`} onClick={() => selectMenu(menu.id)}><span className={styles.mobileIcon}>{menu.icon}</span><span>{menu.id}</span></button>)}<button className={styles.mobileButton} onClick={() => setMenuOpen(true)}><span className={styles.mobileIcon}>•••</span><span>Lainnya</span></button></nav>
+
+    {menuOpen && <div className={styles.mobileMenuBackdrop} onClick={() => setMenuOpen(false)}>
+      <div className={styles.mobileMenu} onClick={e => e.stopPropagation()}>
+        <div className={styles.mobileMenuHead}><div><strong>Menu</strong><span>Semua fitur aplikasi</span></div><button aria-label="Tutup menu" onClick={() => setMenuOpen(false)}>×</button></div>
+        <div className={styles.mobileMenuGroupList}>
+          {['Transaksi', 'Inventori', 'Pembelian', 'Relasi', 'Analitik', 'Sistem'].map(group => (
+            <section key={group}><h3>{group}</h3><div className={styles.mobileMenuGrid}>{menus.filter(menu => menu.group === group).map(menu => <button key={menu.id} className={active === menu.id ? styles.mobileMenuActive : ''} onClick={() => selectMenu(menu.id)}><span>{menu.icon}</span><strong>{menu.label}</strong><small>{menu.desc}</small></button>)}</div></section>
+          ))}
+        </div>
+      </div>
+    </div>}
+
+    <nav className={styles.mobileBar} aria-label="Navigasi cepat">
+      {mobileMenus.map(menu => <button key={menu.id} className={`${styles.mobileButton} ${active === menu.id ? styles.mobileActive : ''}`} onClick={() => selectMenu(menu.id)}><span className={styles.mobileIcon}>{menu.icon}</span><span>{menu.label}</span></button>)}
+      <button className={styles.mobileButton} onClick={() => setMenuOpen(true)}><span className={styles.mobileIcon}>•••</span><span>Lainnya</span></button>
+    </nav>
   </div>
 }
