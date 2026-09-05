@@ -1,0 +1,53 @@
+create or replace function public.reset_business_data(p_business_id uuid, p_mode text default 'transactions') returns jsonb language plpgsql security definer set search_path = public, private as $$
+declare v_uid uuid := auth.uid();
+begin
+ if v_uid is null then raise exception 'Authentication required'; end if;
+ if p_mode not in ('transactions','full') then raise exception 'Invalid reset mode'; end if;
+ if not exists (select 1 from public.business_users bu where bu.business_id=p_business_id and bu.user_id=v_uid and bu.is_active) then raise exception 'Business access denied'; end if;
+ if not exists (select 1 from public.roles r join public.business_users bu on bu.role_id=r.id where bu.business_id=p_business_id and bu.user_id=v_uid and bu.is_active and r.code in ('OWNER','ADMIN')) then raise exception 'Owner or admin permission required'; end if;
+ if p_mode='transactions' then
+   delete from public.expenses where business_id=p_business_id;
+   delete from public.receivable_payments where receivable_id in (select id from public.receivables where business_id=p_business_id);
+   delete from public.payable_payments where payable_id in (select id from public.payables where business_id=p_business_id);
+   delete from public.payment_events where payment_id in (select id from public.payments where business_id=p_business_id);
+   delete from public.payments where business_id=p_business_id;
+   delete from public.receivables where business_id=p_business_id;
+   delete from public.payables where business_id=p_business_id;
+   delete from public.goods_receipt_items where goods_receipt_id in (select id from public.goods_receipts where business_id=p_business_id);
+   delete from public.goods_receipts where business_id=p_business_id;
+   delete from public.purchase_order_items where purchase_order_id in (select id from public.purchase_orders where business_id=p_business_id);
+   delete from public.purchase_orders where business_id=p_business_id;
+   delete from public.sales_return_items where sales_return_id in (select id from public.sales_returns where business_id=p_business_id);
+   delete from public.sales_returns where business_id=p_business_id;
+   delete from public.sale_items where sale_id in (select id from public.sales where business_id=p_business_id);
+   delete from public.sales where business_id=p_business_id;
+   delete from public.stock_adjustment_items where adjustment_id in (select id from public.stock_adjustments where business_id=p_business_id);
+   delete from public.stock_adjustments where business_id=p_business_id;
+   delete from public.stock_transfer_items where transfer_id in (select id from public.stock_transfers where business_id=p_business_id);
+   delete from public.stock_transfers where business_id=p_business_id;
+   delete from public.stock_movements where business_id=p_business_id;
+   delete from public.stock_balances where product_id in (select id from public.products where business_id=p_business_id);
+   delete from public.cash_movements where shift_id in (select id from public.cashier_shifts where business_id=p_business_id);
+   delete from public.cashier_shifts where business_id=p_business_id;
+ else
+   perform public.reset_business_data(p_business_id,'transactions');
+   delete from public.product_barcodes where product_id in (select id from public.products where business_id=p_business_id);
+   delete from public.product_prices where product_id in (select id from public.products where business_id=p_business_id);
+   delete from public.product_units where product_id in (select id from public.products where business_id=p_business_id);
+   delete from public.products where business_id=p_business_id;
+   delete from public.customers where business_id=p_business_id;
+   delete from public.customer_groups where business_id=p_business_id;
+   update public.categories set parent_id=null where business_id=p_business_id;
+   delete from public.categories where business_id=p_business_id;
+   delete from public.brands where business_id=p_business_id;
+   delete from public.price_lists where business_id=p_business_id;
+   delete from public.payment_methods where business_id=p_business_id;
+   delete from public.qris_configurations where business_id=p_business_id;
+   delete from public.locations where branch_id in (select id from public.branches where business_id=p_business_id);
+   delete from public.units where business_id=p_business_id;
+   delete from public.audit_logs where business_id=p_business_id;
+ end if;
+ return jsonb_build_object('business_id',p_business_id,'mode',p_mode,'reset_at',now());
+end; $$;
+revoke all on function public.reset_business_data(uuid,text) from public, anon, authenticated;
+grant execute on function public.reset_business_data(uuid,text) to authenticated;
