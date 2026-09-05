@@ -15,7 +15,9 @@ export type WorkspaceMenuId =
 
 type Props = { menu: WorkspaceMenuId }
 
-const config: Record<WorkspaceMenuId, { title: string; description: string; icon: string; table?: string }> = {
+type MenuMeta = { title: string; description: string; icon: string; table?: string }
+
+const config: Record<WorkspaceMenuId, MenuMeta> = {
   'Pergerakan Stok': { title: 'Pergerakan Stok', description: 'Audit seluruh masuk, keluar, transfer, opname, dan penyesuaian stok pada outlet aktif.', icon: '↕', table: 'stock_movements' },
   'Stok Opname': { title: 'Stok Opname', description: 'Catat hasil penghitungan fisik dan rekonsiliasi persediaan outlet.', icon: '▦', table: 'stock_adjustments' },
   'Penyesuaian Stok': { title: 'Penyesuaian Stok', description: 'Koreksi stok dengan alasan yang terdokumentasi dan jejak audit.', icon: '±', table: 'stock_adjustments' },
@@ -29,7 +31,7 @@ const config: Record<WorkspaceMenuId, { title: string; description: string; icon
   'Laporan Pembelian': { title: 'Laporan Pembelian', description: 'Analisis PO, penerimaan barang, pembelian, dan supplier.', icon: '⇩', table: 'goods_receipts' },
   'Laporan Piutang': { title: 'Laporan Piutang', description: 'Ringkasan piutang pelanggan, jatuh tempo, dan outstanding.', icon: 'AR', table: 'receivables' },
   'Laporan Hutang': { title: 'Laporan Hutang', description: 'Ringkasan hutang supplier dan kewajiban yang akan jatuh tempo.', icon: 'AP', table: 'payables' },
-  'Pengeluaran': { title: 'Pengeluaran', description: 'Catat dan pantau biaya operasional outlet untuk laporan laba rugi.', icon: '−', table: 'expenses' },
+  'Pengeluaran': { title: 'Pengeluaran', description: 'Catat dan pantau biaya operasional outlet untuk laporan laba rugi.', icon: '−' },
   'Laba & Margin': { title: 'Laba & Margin', description: 'Pantau omzet, HPP, laba kotor, pengeluaran, dan margin.', icon: '↗', table: 'sales' },
   'Cabang / Outlet': { title: 'Cabang / Outlet', description: 'Kelola outlet yang tersedia dalam bisnis dan status operasionalnya.', icon: '⌂', table: 'branches' },
   'Karyawan & Akses': { title: 'Karyawan & Akses', description: 'Kelola anggota bisnis, peran, dan akses outlet.', icon: '♙', table: 'business_users' },
@@ -42,7 +44,7 @@ const config: Record<WorkspaceMenuId, { title: string; description: string; icon
   'Kategori': { title: 'Kategori', description: 'Kelola kategori produk dan struktur kategori.', icon: 'C', table: 'categories' },
   'Harga': { title: 'Harga', description: 'Kelola price list dan versi harga yang berlaku.', icon: 'Rp', table: 'product_prices' },
   'QRIS': { title: 'QRIS', description: 'Konfigurasi kanal QRIS dan parameter pembayaran.', icon: 'Q', table: 'qris_configurations' },
-  'Pengaturan Sistem': { title: 'Pengaturan Sistem', description: 'Pengaturan aplikasi dan kontrol operasional tingkat sistem.', icon: '⚙', table: 'settings' },
+  'Pengaturan Sistem': { title: 'Pengaturan Sistem', description: 'Pengaturan aplikasi dan kontrol operasional tingkat sistem.', icon: '⚙' },
 }
 
 const money = (n: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Math.round(n || 0))
@@ -52,26 +54,64 @@ export default function WorkspaceMenuPage({ menu }: Props) {
   const meta = config[menu]
   const [businessId, setBusinessId] = useState('')
   const [branchId, setBranchId] = useState('')
+  const [branchName, setBranchName] = useState('')
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   const load = useCallback(async () => {
-    setLoading(true); setError('')
+    setLoading(true)
+    setError('')
     try {
       const { business, branch } = await getActiveWorkspace()
-      setBusinessId(business.id); setBranchId(branch.id)
+      setBusinessId(business.id)
+      setBranchId(branch.id)
+      setBranchName(String(branch.name || branch.code || 'Outlet aktif'))
       const db = requireSupabase()
-      if (!meta.table) { setRows([]); return }
+
+      if (!meta.table) {
+        setRows([])
+        return
+      }
+
       let query = db.from(meta.table).select('*').limit(100)
-      if (['sales','purchase_orders','goods_receipts','receivables','payables','payments','stock_movements','stock_adjustments','cashier_shifts','audit_logs'].includes(meta.table)) query = query.eq('business_id', business.id).eq('branch_id', branch.id)
-      else if (['branches'].includes(meta.table)) query = query.eq('business_id', business.id)
-      else if (['products','units','categories','payment_methods','qris_configurations','expenses','business_users','price_lists'].includes(meta.table)) query = query.eq('business_id', business.id)
-      const { data, error: e } = await query
-      if (e) throw e
+      const branchScoped = ['sales', 'purchase_orders', 'goods_receipts', 'receivables', 'payables', 'payments', 'stock_movements', 'stock_adjustments', 'cashier_shifts', 'audit_logs']
+      const businessScoped = ['branches', 'products', 'units', 'categories', 'payment_methods', 'expenses', 'business_users', 'price_lists', 'businesses']
+
+      if (branchScoped.includes(meta.table)) {
+        query = query.eq('business_id', business.id).eq('branch_id', branch.id)
+      } else if (businessScoped.includes(meta.table)) {
+        query = query.eq('business_id', business.id)
+      } else if (meta.table === 'qris_configurations') {
+        query = query.eq('business_id', business.id).eq('branch_id', branch.id)
+      } else if (meta.table === 'stock_balances') {
+        const { data: locations, error: locationError } = await db.from('locations').select('id').eq('branch_id', branch.id).eq('is_active', true).order('name').limit(1)
+        if (locationError) throw locationError
+        const locationId = locations?.[0]?.id
+        if (!locationId) {
+          setRows([])
+          return
+        }
+        query = query.eq('location_id', locationId)
+      } else if (meta.table === 'product_prices') {
+        const { data: priceLists, error: priceListError } = await db.from('price_lists').select('id').eq('business_id', business.id).eq('is_active', true)
+        if (priceListError) throw priceListError
+        const priceListIds = (priceLists || []).map(item => item.id).filter(Boolean)
+        if (!priceListIds.length) {
+          setRows([])
+          return
+        }
+        query = query.in('price_list_id', priceListIds)
+      }
+
+      const { data, error: queryError } = await query
+      if (queryError) throw queryError
       setRows(data || [])
-    } catch (e: any) { setError(e?.message || 'Data belum dapat dimuat.') }
-    finally { setLoading(false) }
+    } catch (e: any) {
+      setError(e?.message || 'Data belum dapat dimuat.')
+    } finally {
+      setLoading(false)
+    }
   }, [meta.table])
 
   useEffect(() => { void load() }, [load])
@@ -79,35 +119,37 @@ export default function WorkspaceMenuPage({ menu }: Props) {
   const stats = useMemo(() => {
     const total = rows.length
     const amount = rows.reduce((sum, row) => sum + Number(row.total_amount || row.total || row.outstanding_amount || 0), 0)
-    const active = rows.filter(row => row.is_active !== false && !['VOID','CANCELLED'].includes(String(row.status || '').toUpperCase())).length
+    const active = rows.filter(row => row.is_active !== false && !['VOID', 'CANCELLED'].includes(String(row.status || '').toUpperCase())).length
     return { total, amount, active }
   }, [rows])
 
   const columns = useMemo(() => {
     if (!rows.length) return []
-    const preferred = ['sale_no','order_no','receipt_no','invoice_no','name','code','status','due_date','total_amount','outstanding_amount','qty_base','created_at']
+    const preferred = ['sale_no', 'order_no', 'receipt_no', 'invoice_no', 'name', 'code', 'status', 'due_date', 'total_amount', 'outstanding_amount', 'qty_base', 'created_at']
     return preferred.filter(key => key in rows[0]).slice(0, 5)
   }, [rows])
 
+  const isDataConnected = Boolean(meta.table)
+
   return <section className={styles.page}>
     <header className={styles.header}>
-      <div className={styles.titleRow}><div className={styles.icon}>{meta.icon}</div><div><div className={styles.eyebrow}>{menu === 'Pengaturan Sistem' || ['Bisnis','Outlet','Satuan','Kategori','Harga','QRIS'].includes(menu) ? 'PENGATURAN' : 'MODUL OPERASIONAL'}</div><h1>{meta.title}</h1><p>{meta.description}</p></div></div>
+      <div className={styles.titleRow}><div className={styles.icon}>{meta.icon}</div><div><div className={styles.eyebrow}>{menu === 'Pengaturan Sistem' || ['Bisnis', 'Outlet', 'Satuan', 'Kategori', 'Harga', 'QRIS'].includes(menu) ? 'PENGATURAN' : 'MODUL OPERASIONAL'}</div><h1>{meta.title}</h1><p>{meta.description}</p></div></div>
       <button className={styles.refresh} onClick={() => void load()} disabled={loading}>↻ Perbarui</button>
     </header>
 
-    <div className={styles.scope}><span>Outlet aktif</span><strong>{branchId ? branchId.slice(0, 8) : 'Memuat...'}</strong><span>·</span><span>Business</span><strong>{businessId ? businessId.slice(0, 8) : 'Memuat...'}</strong></div>
+    <div className={styles.scope}><span>Outlet aktif</span><strong>{branchName || 'Memuat...'}</strong><span>·</span><span>Business</span><strong>{businessId ? 'Terhubung' : 'Memuat...'}</strong></div>
 
-    <div className={styles.cards}>
+    {isDataConnected && <div className={styles.cards}>
       <article><span>Data termuat</span><strong>{fmt(stats.total)}</strong><small>Baris pada workspace aktif</small></article>
       <article><span>Aktif / terbuka</span><strong>{fmt(stats.active)}</strong><small>Belum nonaktif/void</small></article>
       <article><span>Nilai terukur</span><strong>{money(stats.amount)}</strong><small>Agregat dari data tersedia</small></article>
-    </div>
+    </div>}
 
     {error && <div className={styles.alert}><strong>Data belum tersedia</strong><span>{error}</span></div>}
 
     <div className={styles.panel}>
-      <div className={styles.panelHead}><div><h2>{meta.title}</h2><p>Data dibatasi ke business dan outlet aktif bila tabel memiliki scope transaksi.</p></div><span className={styles.badge}>{loading ? 'Memuat' : `${fmt(rows.length)} data`}</span></div>
-      {loading ? <div className={styles.empty}>Memuat data workspace...</div> : rows.length === 0 ? <div className={styles.empty}><strong>Belum ada data</strong><span>Modul sudah terhubung ke workspace aktif. Setelah data dibuat, daftar akan muncul di sini.</span></div> : <div className={styles.tableWrap}><table><thead><tr>{columns.map(col => <th key={col}>{col.replaceAll('_',' ')}</th>)}</tr></thead><tbody>{rows.map((row, i) => <tr key={row.id || i}>{columns.map(col => <td key={col}>{col.includes('amount') || col.includes('total') ? money(Number(row[col] || 0)) : col === 'created_at' || col === 'due_date' ? String(row[col] || '').slice(0, 10) : String(row[col] ?? '-')}</td>)}</tr>)}</tbody></table></div>}
+      <div className={styles.panelHead}><div><h2>{meta.title}</h2><p>{isDataConnected ? 'Data dibatasi ke business dan outlet aktif sesuai struktur tabel.' : 'Modul ini belum memiliki tabel operasional khusus pada schema saat ini.'}</p></div><span className={styles.badge}>{loading ? 'Memuat' : isDataConnected ? `${fmt(rows.length)} data` : 'Belum terhubung'}</span></div>
+      {loading ? <div className={styles.empty}>Memuat data workspace...</div> : !isDataConnected ? <div className={styles.empty}><strong>Belum ada workflow backend</strong><span>UI tidak membuat tabel atau data palsu. Modul akan dihubungkan setelah workflow bisnisnya tersedia.</span></div> : rows.length === 0 ? <div className={styles.empty}><strong>Belum ada data</strong><span>Modul sudah terhubung ke workspace aktif. Setelah data dibuat, daftar akan muncul di sini.</span></div> : <div className={styles.tableWrap}><table><thead><tr>{columns.map(col => <th key={col}>{col.replaceAll('_', ' ')}</th>)}</tr></thead><tbody>{rows.map((row, i) => <tr key={row.id || i}>{columns.map(col => <td key={col}>{col.includes('amount') || col.includes('total') ? money(Number(row[col] || 0)) : col === 'created_at' || col === 'due_date' ? String(row[col] || '').slice(0, 10) : String(row[col] ?? '-')}</td>)}</tr>)}</tbody></table></div>}
     </div>
   </section>
 }
