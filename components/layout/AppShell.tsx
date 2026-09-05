@@ -16,34 +16,35 @@ import SettingsPage from '../../features/settings'
 import { getAccessibleBranches, getActiveWorkspace, setStoredBranchId } from '../../lib/business-context'
 import styles from '../../app/app-shell.module.css'
 
-type MenuId = 'Dashboard' | 'Penjualan' | 'Pesanan' | 'Pembayaran' | 'Produk' | 'Stok' | 'Pembelian' | 'Supplier' | 'Pelanggan' | 'Piutang' | 'Laporan' | 'Pengaturan'
+type MenuId = 'Dashboard' | 'Kasir' | 'Penjualan' | 'Pesanan' | 'Pembayaran' | 'Produk' | 'Stok' | 'Pembelian' | 'Supplier' | 'Pelanggan' | 'Piutang' | 'Laporan' | 'Pengaturan'
 type ViewMode = 'retail' | 'distributor' | 'fnb'
-type Menu = { id: MenuId; label: string; icon: string; group: string; desc: string }
+type Menu = { id: MenuId; label: string; icon: string; group: string; desc: string; disabled?: boolean }
 type Branch = Record<string, any>
 
 const menus: Menu[] = [
   { id: 'Dashboard', label: 'Dashboard', icon: '⌂', group: 'DASHBOARD', desc: 'Ringkasan bisnis outlet aktif' },
-  { id: 'Penjualan', label: 'Kasir', icon: '▣', group: 'TRANSAKSI', desc: 'Buat dan proses transaksi penjualan' },
+  { id: 'Kasir', label: 'Kasir', icon: '▣', group: 'TRANSAKSI', desc: 'Buat dan proses transaksi penjualan' },
+  { id: 'Penjualan', label: 'Penjualan', icon: '▤', group: 'TRANSAKSI', desc: 'Riwayat penjualan', disabled: true },
   { id: 'Pesanan', label: 'Pesanan', icon: '◫', group: 'TRANSAKSI', desc: 'Pantau status pesanan penjualan' },
   { id: 'Pembayaran', label: 'Pembayaran', icon: '◉', group: 'TRANSAKSI', desc: 'Pantau pembayaran dan metode pembayaran' },
   { id: 'Produk', label: 'Produk', icon: '□', group: 'INVENTORI', desc: 'Kelola katalog, satuan dan harga produk' },
   { id: 'Stok', label: 'Stok', icon: '▥', group: 'INVENTORI', desc: 'Pantau saldo stok dan koreksi melalui alur persediaan' },
   { id: 'Pembelian', label: 'Pembelian', icon: '⇩', group: 'PEMBELIAN', desc: 'Kelola PO, penerimaan barang dan hutang supplier' },
   { id: 'Supplier', label: 'Supplier', icon: '⇄', group: 'PEMBELIAN', desc: 'Kelola pemasok dan termin pembayaran' },
-  { id: 'Pelanggan', label: 'Pelanggan', icon: '♙', group: 'PELANGGAN', desc: 'Kelola data pelanggan dan limit kredit' },
+  { id: 'Pelanggan', label: 'Pelanggan', icon: '♙', group: 'PELANGGAN', desc: 'Kelola data pelanggan dan riwayat transaksi' },
   { id: 'Piutang', label: 'Piutang', icon: 'Rp', group: 'PELANGGAN', desc: 'Pantau tagihan pelanggan dan pembayaran' },
   { id: 'Laporan', label: 'Laporan', icon: '▤', group: 'LAPORAN', desc: 'Analisis penjualan, stok, pembelian dan keuangan' },
   { id: 'Pengaturan', label: 'Pengaturan', icon: '⚙', group: 'SISTEM', desc: 'Konfigurasi bisnis, outlet dan sistem' },
 ]
 
-const mobileMenus = menus.filter((x, index) => index === 0 || ['Kasir', 'Stok', 'Laporan'].includes(x.label)).filter((x, index, all) => all.findIndex(y => y.id === x.id) === index)
+const mobileMenus = menus.filter(x => ['Dashboard', 'Kasir', 'Stok', 'Laporan'].includes(x.id))
 const groups = ['DASHBOARD', 'TRANSAKSI', 'INVENTORI', 'PEMBELIAN', 'PELANGGAN', 'LAPORAN', 'SISTEM']
 
 function renderFeature(active: MenuId, mode: ViewMode, workspaceVersion: number) {
   const key = `${workspaceVersion}-${mode}`
   switch (active) {
     case 'Dashboard': return <DashboardPage key={key} />
-    case 'Penjualan': return <SalesTerminal key={key} />
+    case 'Kasir': return <SalesTerminal key={key} />
     case 'Pesanan': return <OrdersPage key={key} />
     case 'Produk': return <ProductsPage key={key} />
     case 'Stok': return <InventoryPage key={key} />
@@ -54,11 +55,12 @@ function renderFeature(active: MenuId, mode: ViewMode, workspaceVersion: number)
     case 'Laporan': return <ReportsPage key={key} />
     case 'Pembayaran': return <PaymentsPage key={key} />
     case 'Pengaturan': return <SettingsPage key={key} />
+    case 'Penjualan': return <SalesTerminal key={key} />
   }
 }
 
 export default function AppShell() {
-  const [active, setActive] = useState<MenuId>('Penjualan')
+  const [active, setActive] = useState<MenuId>('Dashboard')
   const [menuOpen, setMenuOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [salesMode, setSalesMode] = useState<ViewMode>('retail')
@@ -148,7 +150,7 @@ export default function AppShell() {
           <div className={styles.navGroup} key={group}>
             <div className={styles.navLabel}>{group}</div>
             {menus.filter(menu => menu.group === group).map((menu, index) => {
-              const disabled = 'disabled' in menu && Boolean((menu as Menu & { disabled?: boolean }).disabled)
+              const disabled = Boolean(menu.disabled)
               return <button key={`${group}-${menu.label}-${index}`} title={sidebarCollapsed ? menu.label : disabled ? 'Belum tersedia' : undefined} disabled={disabled} className={`${styles.navButton} ${active === menu.id && !disabled ? styles.navActive : ''} ${disabled ? styles.navDisabled : ''}`} onClick={() => !disabled && selectMenu(menu.id)}>
                 <span className={styles.icon}>{menu.icon}</span>
                 <span className={styles.navText}>{menu.label}</span>
@@ -174,7 +176,7 @@ export default function AppShell() {
         <div className={styles.mobileMenuGroupList}>
           {groups.filter(x => x !== 'DASHBOARD').map(group => (
             <section key={group}><h3>{group}</h3><div className={styles.mobileMenuGrid}>{menus.filter(menu => menu.group === group).map((menu, index) => {
-              const disabled = 'disabled' in menu && Boolean((menu as Menu & { disabled?: boolean }).disabled)
+              const disabled = Boolean(menu.disabled)
               return <button key={`${group}-${menu.label}-${index}`} disabled={disabled} className={active === menu.id && !disabled ? styles.mobileMenuActive : ''} onClick={() => !disabled && selectMenu(menu.id)}><span>{menu.icon}</span><strong>{menu.label}</strong><small>{disabled ? 'Segera tersedia' : menu.desc}</small></button>
             })}</div></section>
           ))}
