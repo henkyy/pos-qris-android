@@ -14,27 +14,16 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-      - name: Patch purchase workflow
+      - name: Patch purchase creation to atomic RPC
         shell: python
         run: |
           from pathlib import Path
-          import re
           p = Path('features/purchases/PurchaseWorkspace.tsx')
           s = p.read_text()
-          old = "const [paymentTerm,setPaymentTerm]=useState<'PAID'|'CREDIT'>('PAID'); const [dueDate,setDueDate]=useState('');"
-          if old not in s: raise SystemExit('state target not found')
-          s = s.replace(old, '', 1)
-          old = "setPaymentTerm('PAID');setDueDate('');"
-          if old not in s: raise SystemExit('reset target not found')
-          s = s.replace(old, '', 1)
           old = "const orderNo=`PO-${new Date().toISOString().replace(/\\D/g,'').slice(0,14)}`;const {data:order,error:oe}=await db.from('purchase_orders').insert({business_id:businessId,branch_id:branchId,supplier_id:supplierId,order_no:orderNo,order_date:new Date(`${orderDate}T00:00:00`).toISOString(),expected_date:expectedDate||null,status:'DRAFT',subtotal:Math.round(subtotal),discount_amount:Math.round(discountAmount),tax_amount:Math.round(taxAmount),other_cost:Math.round(otherAmount),total_amount:Math.round(total),notes:notes||null}).select('id').single();if(oe)throw oe;const {error:ie}=await db.from('purchase_order_items').insert(cart.map(i=>({purchase_order_id:order.id,product_id:i.id,unit_id:i.base_unit_id,qty:i.qty,unit_cost:Math.round(i.unitCost),discount_amount:0,tax_amount:0,line_total:Math.round(i.qty*i.unitCost),received_qty:0})));if(ie)throw ie;"
           new = "const orderNo=`PO-${new Date().toISOString().replace(/\\D/g,'').slice(0,14)}`;const {data:order,error:oe}=await db.rpc('purchase_order_create',{p_business_id:businessId,p_branch_id:branchId,p_supplier_id:supplierId,p_order_no:orderNo,p_order_date:new Date(`${orderDate}T00:00:00`).toISOString(),p_expected_date:expectedDate||null,p_discount_amount:Math.round(discountAmount),p_tax_amount:Math.round(taxAmount),p_other_cost:Math.round(otherAmount),p_total_amount:Math.round(total),p_notes:notes||null,p_items:cart.map(i=>({product_id:i.id,unit_id:i.base_unit_id,qty:i.qty,unit_cost:Math.round(i.unitCost)}))});if(oe)throw oe;"
           if old not in s: raise SystemExit('save purchase target not found')
-          s = s.replace(old, new, 1)
-          pattern = r"<div className=\{styles\.term\}>.*?</div>\{paymentTerm==='CREDIT'&&<label>Jatuh tempo.*?</label>\}"
-          s2 = re.sub(pattern, "<div className={styles.term}><strong>Termin pembayaran ditentukan saat penerimaan</strong><span>Setelah barang diterima, pilih Lunas atau Tempo sesuai invoice supplier dan jatuh tempo aktual.</span></div>", s, count=1, flags=re.S)
-          if s2 == s: raise SystemExit('payment term UI target not found')
-          p.write_text(s2)
+          p.write_text(s.replace(old, new, 1))
       - name: Verify build
         run: npm install && npm run build
       - name: Commit and remove temporary workflow
@@ -42,7 +31,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add features/purchases/PurchaseWorkspace.tsx .github/workflows/erp-hardening-patch.yml
-          git commit -m 'fix(purchases): use atomic PO creation and align payment term UX'
+          git commit -m 'fix(purchases): use atomic PO creation'
           git rm .github/workflows/erp-hardening-patch.yml
           git commit -m 'chore(ci): remove temporary ERP hardening patch workflow'
           git push origin main
