@@ -90,7 +90,7 @@ export default function ProductCatalog() {
       const ids = (p || []).map((x: any) => x.id)
       const [{ data: pu, error: pue }, { data: pp, error: ppe }] = await Promise.all([
         ids.length ? db.from('product_units').select('*').in('product_id', ids) : Promise.resolve({ data: [], error: null }),
-        ids.length && lid ? db.from('product_prices').select('*').eq('price_list_id', lid).in('product_id', ids).is('valid_until', null) : Promise.resolve({ data: [], error: null }),
+        ids.length && lid ? db.from('product_prices').select('*').eq('price_list_id', lid).in('product_id', ids).or(`valid_from.is.null,valid_from.lte.${new Date().toISOString()}`).or(`valid_until.is.null,valid_until.gte.${new Date().toISOString()}`) : Promise.resolve({ data: [], error: null }),
       ])
       if (pue) throw pue
       if (ppe) throw ppe
