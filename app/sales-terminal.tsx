@@ -131,7 +131,6 @@ export default function SalesTerminal() {
       const defaultMethod = cashMethod || usable[0]
       setProducts(ps || []); setCategories(cs || []); setUnits(us || []); setStock(bs || []); setCustomers(cus || []); setPaymentMethods(usable); setBusinessId(business.id); setBranchId(branch.id); setLocationId(locationIdNext); setPrices(prs || []); setPaymentMethodId(defaultMethod?.id || ''); setPaymentCode(normalizePaymentCode(text(defaultMethod?.code || defaultMethod?.method_type || 'CASH'))); setOnline(true)
       await saveCatalogCache({ products: ps || [], categories: cs || [], units: us || [], prices: prs || [], stock: bs || [], businessId: business.id, branchId: branch.id, locationId: locationIdNext, cashMethodId: cashMethod?.id || '', paymentMethods: usable, customers: cus || [] } as any)
-      await refreshPending()
     } catch (e: any) {
       const cached = await getCatalogCache({ branchId: getStoredBranchId() || undefined }).catch(() => null)
       if (cached) {
@@ -141,7 +140,9 @@ export default function SalesTerminal() {
         if (e?.message !== 'OFFLINE_MODE') toast('info', 'Mode offline', 'Server tidak dapat dihubungi. Katalog, stok, pelanggan, dan metode tersimpan lokal tetap digunakan.')
       } else toast('error', 'Gagal memuat data', e.message || 'Periksa koneksi Supabase.')
     } finally { if (!silent) setLoading(false) }
-  }, [refreshPending, toast])
+  }, [toast])
+
+  useEffect(() => { refreshPending() }, [refreshPending])
 
   const syncPending = useCallback(async () => {
     if (!navigator.onLine) return
